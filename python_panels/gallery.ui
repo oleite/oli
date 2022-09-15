@@ -1,0 +1,454 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AssetGallery</class>
+ <widget class="QWidget" name="AssetGallery">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>622</width>
+    <height>402</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_2">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QTabWidget" name="tabWidget">
+     <property name="whatsThis">
+      <string notr="true"/>
+     </property>
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <widget class="QWidget" name="libraryTab">
+      <attribute name="title">
+       <string>Library</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <property name="spacing">
+        <number>5</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>3</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QWidget" name="widget" native="true">
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <property name="spacing">
+           <number>5</number>
+          </property>
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QComboBox" name="rootBox"/>
+          </item>
+          <item>
+           <widget class="QComboBox" name="collectionsBox">
+            <property name="currentText">
+             <string>Collection ↓ </string>
+            </property>
+            <item>
+             <property name="text">
+              <string>Collection ↓ </string>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="libraryTopBarContainer" native="true">
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QLineEdit" name="searchBar">
+            <property name="placeholderText">
+             <string>Search String or Pattern (Eg.: Soldado*A001)</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSlider" name="thumbnailSizeSlider">
+            <property name="toolTip">
+             <string comment="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" extracomment="AAAAAAAAAAAA">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Changes the thumbnail sizes&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="statusTip">
+             <string comment="BBBBBBBBBBBBBBBBBB" extracomment="BBBBBBBBBBBBBBBBBBBB"/>
+            </property>
+            <property name="whatsThis">
+             <string comment="CCCCCCCCCCCCCCCCCCCC" extracomment="CCCCCCCCCCCCCC"/>
+            </property>
+            <property name="minimum">
+             <number>50</number>
+            </property>
+            <property name="maximum">
+             <number>500</number>
+            </property>
+            <property name="value">
+             <number>50</number>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="toggleListView">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Toggles between the List and Grid view modes&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normalon>C:/Users/gabriel.leite/.designer/img/list_view.png</normalon>
+             </iconset>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>16</width>
+              <height>16</height>
+             </size>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QListWidget" name="assetList">
+         <property name="acceptDrops">
+          <bool>true</bool>
+         </property>
+         <property name="dragEnabled">
+          <bool>true</bool>
+         </property>
+         <property name="selectionMode">
+          <enum>QAbstractItemView::ExtendedSelection</enum>
+         </property>
+         <property name="movement">
+          <enum>QListView::Static</enum>
+         </property>
+         <property name="resizeMode">
+          <enum>QListView::Adjust</enum>
+         </property>
+         <property name="spacing">
+          <number>0</number>
+         </property>
+         <property name="gridSize">
+          <size>
+           <width>100</width>
+           <height>100</height>
+          </size>
+         </property>
+         <property name="viewMode">
+          <enum>QListView::IconMode</enum>
+         </property>
+         <property name="uniformItemSizes">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTextBrowser" name="messageBrowser">
+         <property name="maximumSize">
+          <size>
+           <width>16777215</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="openExternalLinks">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="folderManagementTab">
+      <attribute name="title">
+       <string>Folder Management</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_3">
+       <property name="spacing">
+        <number>10</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>3</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QTableWidget" name="foldersTable">
+         <property name="contextMenuPolicy">
+          <enum>Qt::CustomContextMenu</enum>
+         </property>
+         <property name="selectionBehavior">
+          <enum>QAbstractItemView::SelectRows</enum>
+         </property>
+         <property name="cornerButtonEnabled">
+          <bool>false</bool>
+         </property>
+         <property name="columnCount">
+          <number>3</number>
+         </property>
+         <attribute name="verticalHeaderVisible">
+          <bool>false</bool>
+         </attribute>
+         <column>
+          <property name="text">
+           <string>root</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>model</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>config</string>
+          </property>
+         </column>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>searchBar</sender>
+   <signal>textChanged(QString)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>filterItems()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>84</x>
+     <y>58</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>96</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>collectionsBox</sender>
+   <signal>currentTextChanged(QString)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>collectionChanged()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>358</x>
+     <y>31</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>47</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>thumbnailSizeSlider</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>thumbnailResize()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>354</x>
+     <y>59</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>240</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>assetList</sender>
+   <signal>itemDoubleClicked(QListWidgetItem*)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>import_asset()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>380</x>
+     <y>213</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>496</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>toggleListView</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>toggleListView()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>611</x>
+     <y>59</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>501</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>foldersTable</sender>
+   <signal>customContextMenuRequested(QPoint)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>spawnFoldersTableContextMenu()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>101</x>
+     <y>50</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>203</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>thumbnailSizeSlider</sender>
+   <signal>sliderReleased()</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>saveState()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>325</x>
+     <y>64</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>312</x>
+     <y>-121</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>rootBox</sender>
+   <signal>currentTextChanged(QString)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>rootChanged()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>169</x>
+     <y>38</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>203</x>
+     <y>-149</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>foldersTable</sender>
+   <signal>itemChanged(QTableWidgetItem*)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>saveState()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>101</x>
+     <y>50</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>388</x>
+     <y>-169</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>tabWidget</sender>
+   <signal>currentChanged(int)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>tabChanged()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>70</x>
+     <y>7</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>79</x>
+     <y>-158</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>updateParms()</slot>
+  <slot>filterItems()</slot>
+  <slot>collectionChanged()</slot>
+  <slot>thumbnailResize()</slot>
+  <slot>import_asset()</slot>
+  <slot>toggleListView()</slot>
+  <slot>save_preferences()</slot>
+  <slot>spawnFoldersTableContextMenu()</slot>
+  <slot>updateRootBox()</slot>
+  <slot>saveState()</slot>
+  <slot>loadState()</slot>
+  <slot>rootChanged()</slot>
+  <slot>tabChanged()</slot>
+ </slots>
+</ui>

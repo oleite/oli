@@ -1,0 +1,13 @@
+{
+    "folders": {
+        "U:/oleite/MEGASCANS_Library/Downloaded": {
+            "model": "MegascansModel",
+            "config": "{}"
+        },
+        "$OLI_ROOT/node_setups": {
+            "model": "HoudiniNodeSetups",
+            "config": "{}"
+        }
+    }, 
+    "last_root": "$OLI_ROOT/node_setups"
+}

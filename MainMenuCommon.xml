@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mainMenu>
+  <menuBar>
+    <subMenu>
+      <insertBefore>help_menu</insertBefore>
+      <label>oli</label>
+
+      <!-- Item: Asset Gallery -->
+
+      <scriptItem id="oli.open_gallery">
+        <label>Open Asset Gallery</label>
+        <scriptCode><![CDATA[
+from oli import gallery
+from imp import reload
+reload(gallery)
+attemptSplit = not bool(kwargs["ctrlclick"])
+gallery.openGallery(attemptSplit)
+        ]]></scriptCode>
+      </scriptItem>
+
+      <separatorItem></separatorItem>
+
+      <scriptItem>
+          <label>web</label>
+          <scriptCode><![CDATA[
+import webbrowser
+webbrowser.open("https://github.com/oleite")
+          ]]></scriptCode>
+      </scriptItem>
+
+    </subMenu>
+  </menuBar>
+</mainMenu>

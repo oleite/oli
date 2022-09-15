@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<menuDocument>
+    <menu>
+        <separatorItem id="opmenu.oli_sep1">
+            <insertAfter>opmenu.help</insertAfter>
+        </separatorItem>
+
+        <scriptItem id="opmenu.olcb_selection_add_prefix">
+            <insertAfter>opmenu.olcb_lookdev_sep1</insertAfter>
+            <label>RENDERIZAR</label>
+            <scriptCode><![CDATA[
+from olcb import lookdev
+reload(lookdev)
+lookdev.selection_prefix(kwargs)
+            ]]></scriptCode>
+        </scriptItem>
+
+        <scriptItem id="opmenu.olcb_selection_remove_prefix">
+            <insertAfter>opmenu.olcb_selection_add_prefix</insertAfter>
+            <label>NAO RENDERIZAR</label>
+            <scriptCode><![CDATA[
+from olcb import lookdev
+reload(lookdev)
+lookdev.selection_prefix(kwargs, remove=True)
+            ]]></scriptCode>
+        </scriptItem>
+
+        <separatorItem id="opmenu.oli_sep2">
+        </separatorItem>
+    </menu>
+</menuDocument>
