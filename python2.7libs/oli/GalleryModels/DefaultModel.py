@@ -144,6 +144,7 @@ class DefaultModel(object):
         :return: List of QListWidgetItems
         """
         self.Gallery.ui.assetList.clear()
+
         if not os.path.exists(self.Gallery.collectionPath):
             return
 
@@ -247,7 +248,7 @@ class DefaultModel(object):
 
     def collectionsList(self):
         self.Gallery.ui.assetList.clear()
-        root = self.Gallery.ui.rootBox.currentText()
+        root = hou.text.expandString(self.Gallery.ui.rootBox.currentText())
         if os.path.exists(root):
             collections_list = next(os.walk(root))[1]
             return collections_list
@@ -269,6 +270,7 @@ class DefaultModel(object):
                 break
 
         self.Gallery.collectionPath = self.Gallery.ui.rootBox.currentText() + "/" + collection
+        self.Gallery.collectionPath = hou.text.expandString(self.Gallery.collectionPath)
         self.Gallery.createItems()
 
     def refresh(self):

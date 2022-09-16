@@ -158,7 +158,7 @@ class Ui_AssetGallery(object):
         self.collectionsBox.setItemText(0, QCoreApplication.translate("AssetGallery", u"Collection \u2193 ", None))
 
         self.collectionsBox.setCurrentText(QCoreApplication.translate("AssetGallery", u"Collection \u2193 ", None))
-        self.searchBar.setPlaceholderText(QCoreApplication.translate("AssetGallery", u"Search String or Pattern (Eg.: Soldado*A001)", None))
+        self.searchBar.setPlaceholderText(QCoreApplication.translate("AssetGallery", u"Search string or Pattern (Eg.: tree*01)", None))
 #if QT_CONFIG(tooltip)
         self.thumbnailSizeSlider.setToolTip(QCoreApplication.translate("AssetGallery", u"<html><head/><body><p>Changes the thumbnail sizes</p></body></html>", u"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
 #endif // QT_CONFIG(tooltip)

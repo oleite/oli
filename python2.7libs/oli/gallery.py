@@ -55,6 +55,7 @@ class LoadItemThumbnail(QtCore.QRunnable):
             return
 
         thumbnail_path = self.item.data(QtCore.Qt.UserRole)["thumbnail_path"]
+        thumbnail_path = hou.text.expandString(thumbnail_path)
 
         if not thumbnail_path or not os.path.exists(thumbnail_path):
             return
@@ -118,6 +119,7 @@ class Gallery(QtWidgets.QWidget):
         self.LoadItemThumbnail = LoadItemThumbnail
         self.thumbnailLoadedCount = 0
 
+        self.color = hou.Color()
         self.applyStyles()
 
         self.threadPool = QtCore.QThreadPool()
@@ -412,13 +414,26 @@ class Gallery(QtWidgets.QWidget):
 
         for row in range(self.ui.foldersTable.rowCount()):
             root = self.ui.foldersTable.item(row, 0).text()
-            root = hou.text.expandString(root)
+            root = root
             self.ui.rootBox.addItem(root)
 
+            # Add Model Icons
             modelIconPath = iconsPath + "/" + self.ui.foldersTable.item(row, 1).text() + "*"
-            modelIconPath = utils.patternMatchFile(modelIconPath)
+            modelIconPath = utils.patternMatchFile(hou.text.expandString(modelIconPath))
             if os.path.exists(modelIconPath):
                 self.ui.rootBox.setItemIcon(self.ui.rootBox.count()-1, QtGui.QIcon(modelIconPath))
+
+            # Add Colors to the rooBox
+            with open(self.preferencesFile, "r") as f:
+                try:
+                    data = json.load(f)
+                except ValueError:
+                    pass
+            try:
+                rgb = data["folders"][root]["config"]["color"]
+                self.ui.rootBox.setItemData(row, QtGui.QColor(rgb[0], rgb[1], rgb[2]), QtCore.Qt.ForegroundRole)
+            except KeyError:
+                pass
 
         self.loadStateRoot()
         self.ui.rootBox.blockSignals(False)
@@ -429,6 +444,7 @@ class Gallery(QtWidgets.QWidget):
 
         :return: None
         """
+        self.setMessage("")
         self.loadState()
         self.saveState()
 
@@ -442,10 +458,14 @@ class Gallery(QtWidgets.QWidget):
         if not block_signals:
             self.ui.collectionsBox.blockSignals(False)
 
+        self.ui.collectionsBox.setDisabled(False)
+
         Model = self.getModel()
         collections_list = Model.collectionsList()
         if not collections_list:
             collections_list = [""]
+            self.ui.collectionsBox.setDisabled(True)
+            self.setMessage("No collection found")
         self.ui.collectionsBox.addItems(sorted(collections_list))
 
     def collectionChanged(self, save_state=True):
@@ -506,6 +526,7 @@ class Gallery(QtWidgets.QWidget):
                 "__ASSET__": asset_name,
             }
         for key in remappings:
+            key = hou.text.expandString(key)
             path = path.replace(key, remappings[key])
 
         path = utils.patternMatchFile(path)
@@ -612,6 +633,7 @@ class Gallery(QtWidgets.QWidget):
 
         :return: None
         """
+        rgb = utils.houColorTo255(self.color)
 
         self.ui.toggleListView.setStyleSheet("""
             QToolButton {
@@ -628,41 +650,45 @@ class Gallery(QtWidgets.QWidget):
         """)
 
         self.ui.assetList.setStyleSheet("""
-        QListWidget::item:selected {
-            background-color: rgba(2,38,99,.3);
-            border: 0;
-        }
-        QToolTip {
-            padding: 6px;
-        }
-        QListWidget[ListMode="true"] {
-            color: red;
-            background-color: red;
-        }
-        """)
+            QListWidget::item:selected {{
+                background-color: rgba({r},{g},{b},.2);
+                border: 0;
+            }}
+            QToolTip {{
+                padding: 6px;
+            }}
+            QListWidget[ListMode="true"] {{
+                color: red;
+                background-color: red;
+            }}
+        """.format(r=rgb[0], g=rgb[1], b=rgb[2]))
 
         self.ui.thumbnailSizeSlider.setStyleSheet("""
-            QSlider::groove {
+            QSlider::groove {{
                 padding: 2px 0 2px 0;
                 margin: 2px 0;
-            }
-            QSlider::handle {
+            }}
+            QSlider::handle {{
                 width: 50px;
-            }
-            QSlider::add-page {
+            }}
+            QSlider::add-page {{
                 /* */
-            }
+            }}
 
-            QSlider::handle:disabled {
+            QSlider::sub-page {{
+                background: rgba({r},{g},{b},.3);
+            }}
+
+            QSlider::handle:disabled {{
                 background: #535454;
-            }
-            QSlider::groove:disabled {
+            }}
+            QSlider::groove:disabled {{
                 background: #222;
-            }
-            QSlider::sub-page:disabled {
+            }}
+            QSlider::sub-page:disabled {{
                 background: #535454;
-            }
-        """)
+            }}
+        """.format(r=rgb[0], g=rgb[1], b=rgb[2]))
 
         self.ui.messageBrowser.document().setDefaultStyleSheet("""
             body {
@@ -674,6 +700,10 @@ class Gallery(QtWidgets.QWidget):
             .error {
                 color: red;
             }
+        """)
+
+        self.ui.rootBox.setStyleSheet("""
+                    
         """)
 
     def saveState(self, e=None, preferencesFile=None):
@@ -790,7 +820,6 @@ class Gallery(QtWidgets.QWidget):
 
         if "last_root" in data:
             last_root = data["last_root"]
-            last_root = hou.text.expandString(last_root)
             if self.ui.rootBox.findText(last_root) != -1:
                 self.ui.rootBox.setCurrentText(last_root)
 
@@ -959,3 +988,21 @@ class Gallery(QtWidgets.QWidget):
                 config_item.setText(json.dumps(data, indent=4, sort_keys=True))
                 self.saveState()
                 return
+
+    def updateCurModelConfig(self, newData):
+        """
+
+        :param newData:
+        :return:
+        """
+        data = self.getCurModelConfig()
+        data.update(newData)
+        self.setCurModelConfig(data)
+
+    def changeColor(self, color, alpha):
+        self.color = color
+        self.updateCurModelConfig({
+            "color": utils.houColorTo255(color),
+        })
+
+        self.applyStyles()

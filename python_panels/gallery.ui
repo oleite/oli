@@ -108,7 +108,7 @@
           <item>
            <widget class="QLineEdit" name="searchBar">
             <property name="placeholderText">
-             <string>Search String or Pattern (Eg.: Soldado*A001)</string>
+             <string>Search string or Pattern (Eg.: tree*01)</string>
             </property>
            </widget>
           </item>

@@ -102,7 +102,8 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
         elif action == "action_create_collection":
             collection = hou.ui.readInput("Collection Name")[1]
             if collection:
-                os.makedirs(self.Gallery.ui.rootBox.currentText() + "/" + collection)
+                os.makedirs(hou.text.expandString(self.Gallery.ui.rootBox.currentText() + "/" + collection))
+                self.Gallery.setMessage("")
                 self.Gallery.loadState()
 
         elif action == "action_refresh":
@@ -121,15 +122,15 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
         itemData = {}
 
         thumbnail_path = ag.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/thumbnail.jpg")
-        if not os.path.isfile(thumbnail_path):
+        if not os.path.isfile(hou.text.expandString(thumbnail_path)):
             thumbnail_path = None
 
         setup_file = ag.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/__ASSET__.hns")
-        if not os.path.isfile(setup_file):
+        if not os.path.isfile(hou.text.expandString(setup_file)):
             setup_file = None
 
         info_file = ag.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/info.json")
-        if os.path.isfile(info_file):
+        if os.path.isfile(hou.text.expandString(info_file)):
             itemData["info_file"] = info_file
             with io.open(info_file, "r", encoding='utf8') as f:
                 info = json.load(f)
@@ -345,6 +346,9 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
             self.Gallery.filterItems()
 
         # Update foldersTable Config
+        self.Gallery.updateCurModelConfig({
+
+        })
         data = self.Gallery.getCurModelConfig()
         data.update({
             "show_all": self.show_all

@@ -1,5 +1,9 @@
 {
     "folders": {
+        "$HOME/my_node_setups" : {
+            "model": "HoudiniNodeSetups",
+            "config": "{}"
+        },
         "U:/oleite/MEGASCANS_Library/Downloaded": {
             "model": "MegascansModel",
             "config": "{}"

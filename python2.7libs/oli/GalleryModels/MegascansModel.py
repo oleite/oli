@@ -18,10 +18,6 @@ class MegascansModel(DefaultModel.DefaultModel):
     def __init__(self, ag):
         super(MegascansModel, self).__init__(ag)
 
-        if hou.applicationVersion()[0] < 19:
-            self.valid = False
-            self.Gallery.setMessage('<span class="error">MegascansModel só é suportado a partir do Houdini 19</span>')
-
     def assetListContextMenu(self, event, itemList):
         if not self.valid:
             return False
@@ -39,6 +35,11 @@ class MegascansModel(DefaultModel.DefaultModel):
             action_refresh.setProperty("action", "action_refresh")
             menu.addAction(action_refresh)
 
+            # Menu Item: Change Color
+            action_change_color = QtWidgets.QAction("Change Color", self.Gallery)
+            action_change_color.setProperty("action", "action_change_color")
+            menu.addAction(action_change_color)
+
             # Open Menu
             menu_exec = menu.exec_(event.globalPos())
             if not menu_exec:
@@ -52,6 +53,9 @@ class MegascansModel(DefaultModel.DefaultModel):
 
             elif action == "action_refresh":
                 self.refresh()
+
+            elif action == "action_change_color":
+                hou.ui.openColorEditor(self.Gallery.changeColor, initial_color=self.Gallery.color)
 
             return True
 
@@ -174,7 +178,10 @@ class MegascansModel(DefaultModel.DefaultModel):
         }
 
         ms_json_path = self.Gallery.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/*.json")
-        with open(ms_json_path, "r") as f:
+        if not os.path.isfile(ms_json_path):
+            return
+
+        with open(hou.text.expandString(ms_json_path), "r") as f:
             ms_dict = json.load(f)
 
         itemData.update({
@@ -215,14 +222,14 @@ class MegascansModel(DefaultModel.DefaultModel):
         selection = hou.selectedNodes()
         asset_id = asset_directory.split("_")[-1]
 
-        with open(asset_directory + "/" + asset_id + ".json") as f:
+        with open(hou.text.expandString(itemData["ms_json_path"])) as f:
             data = json.load(f)
 
         asset_type = os.path.split(os.path.dirname(asset_directory))[-1]
         asset_name = lookdev.make_safe(data["name"])
         asset_name_full = asset_name + "_" + asset_id
 
-        asset_save_directory = save_directory + "/" + asset_name_full
+        asset_save_directory = hou.text.expandString(save_directory + "/" + asset_name_full)
         if not os.path.exists(asset_save_directory):
             os.makedirs(asset_save_directory)
 
@@ -290,3 +297,10 @@ hou.hipFile.save()
         topnet.parm("cookbutton").pressButton()
 
         return assetreference
+
+    def collectionChanged(self):
+        super(MegascansModel, self).collectionChanged()
+
+        if hou.applicationVersion()[0] < 19:
+            self.valid = False
+            self.Gallery.setMessage('<span class="error">MegascansModel só é suportado a partir do Houdini 19</span>')
