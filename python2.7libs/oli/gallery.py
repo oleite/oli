@@ -104,6 +104,8 @@ class Gallery(QtWidgets.QWidget):
 
         self.Model = None
 
+        self.debug = bool(hou.getenv("OLI_DEBUG"))
+
         self.currentRootModel = None
         self.collectionPath = ""
         reload(galleryUi)
@@ -162,6 +164,9 @@ class Gallery(QtWidgets.QWidget):
             self.ui.tabWidget.setCurrentIndex(1)
             self.loadDefaultFolders()
             self.ui.tabWidget.setCurrentIndex(0)
+
+        if self.debug:
+            self.paneTab.showToolbar(True)
 
     def getModel(self, modelName=None):
         """
@@ -634,25 +639,97 @@ class Gallery(QtWidgets.QWidget):
         :return: None
         """
         rgb = utils.houColorTo255(self.color)
+        bg1 = "#0F1112"
+        bg2 = "#181C1F"
+        bg3 = "#22272B"
+
+        self.setStyleSheet("""
+            Gallery {{
+                background: #2e2e2e;
+                border: 0;
+            }}
+            
+            libraryTab {{
+                border: 0;
+            }}
+            QWidget {{
+                border: 0;
+            }}
+            
+            QTabWidget::pane {{
+            }}
+            QTabWidget::tab-bar {{
+                border: 0;
+            }}
+            
+            QTabBar::tab {{
+                border: 1px solid transparent;
+                border-radius: 5px 5px 0 0;
+                background: #2e2e2e;
+                padding: 0px 30px;
+            }}
+            QTabBar::tab::selected {{
+                background: #444;
+                font-weight: bold;
+            }}
+            
+            QLineEdit {{
+                padding: 7px;
+                border: 1px solid transparent;
+                border-bottom: 3px;
+                border-radius: 5px;
+            }}
+            QLineEdit::focus {{
+                border-bottom: 3px solid rgba({r},{g},{b},.5);
+            }}
+
+            
+            QComboBox {{
+                border: 1px solid transparent;
+                border-radius: 5px;
+                background: #222;
+            }}
+            QComboBox::drop-down {{
+                min-width: 50px;
+            }}
+            QComboBox::hover {{
+                background: #2e2e2e;
+            }}
+        """.format(r=rgb[0], g=rgb[1], b=rgb[2]))
 
         self.ui.toggleListView.setStyleSheet("""
             QToolButton {
                 border: 0;
-                background: #333;
+                background: transparent;
                 padding: 5px 15px;
             }
             QToolButton::hover {
-                background: #555
+                background: #444;
             }
             QToolButton:checked {
-                background: #222;
+                background: #2e2e2e;
             }
         """)
 
+        # self.ui.assetList.setSpacing(5)
+
+        # self.ui.assetList.setIconSize(QtCore.QSize(4, 4))
+
         self.ui.assetList.setStyleSheet("""
+            QListWidget {{
+                background-color: #222;
+            }}
+            
+            QListWidget::item {{
+                background-color: #252525;
+                margin: 5px;
+                border: 0px solid transparent;
+                border-radius: 5px;
+            }}
+        
             QListWidget::item:selected {{
                 background-color: rgba({r},{g},{b},.2);
-                border: 0;
+                border: 1px;
             }}
             QToolTip {{
                 padding: 6px;
@@ -663,30 +740,50 @@ class Gallery(QtWidgets.QWidget):
             }}
         """.format(r=rgb[0], g=rgb[1], b=rgb[2]))
 
-        self.ui.thumbnailSizeSlider.setStyleSheet("""
+        self.ui.thumbnailSizeSlider.setStyleSheet("""        
             QSlider::groove {{
-                padding: 2px 0 2px 0;
-                margin: 2px 0;
+                padding: 0;
+                margin: 0;
+            
+                height: 20px;
+                border: 1px solid transparent;
+                border-radius: 5px;
+                background: transparent;
             }}
+
             QSlider::handle {{
+                padding: 0;
+                margin: -1px 0;
+                
+                background: #4a4a4a;
                 width: 50px;
+                border: 1px solid transparent;
+                border-radius: 5px;
             }}
+            QSlider::handle:hover {{
+                background: #666;
+            }}
+
             QSlider::add-page {{
-                /* */
+                padding: 0;
+                margin: 1px 0;
+            
+                background: #222;
+                border: 1px solid transparent;
+                border-radius: 5px;
             }}
 
             QSlider::sub-page {{
-                background: rgba({r},{g},{b},.3);
+                padding: 0;
+                margin: 1px 0;
+            
+                background: #222;
+                border: 1px solid transparent;
+                border-radius: 5px;
             }}
 
             QSlider::handle:disabled {{
-                background: #535454;
-            }}
-            QSlider::groove:disabled {{
-                background: #222;
-            }}
-            QSlider::sub-page:disabled {{
-                background: #535454;
+                background: #333;
             }}
         """.format(r=rgb[0], g=rgb[1], b=rgb[2]))
 
@@ -703,7 +800,7 @@ class Gallery(QtWidgets.QWidget):
         """)
 
         self.ui.rootBox.setStyleSheet("""
-                    
+                
         """)
 
     def saveState(self, e=None, preferencesFile=None):
@@ -780,8 +877,11 @@ class Gallery(QtWidgets.QWidget):
         if "folders" in data:
             root = self.ui.rootBox.currentText()
             if root in data["folders"] and "config" in data["folders"][root]:
-                if "last_collection" in data["folders"][root]["config"]:
-                    self.ui.collectionsBox.setCurrentText(data["folders"][root]["config"]["last_collection"])
+                config = data["folders"][root]["config"]
+                if "last_collection" in config:
+                    self.ui.collectionsBox.setCurrentText(config["last_collection"])
+                if "color" in config:
+                    self.changeColor(utils.rgb255toHouColor(config["color"]))
 
         if "thumbnail_size" in data:
             self.ui.thumbnailSizeSlider.setValue(data["thumbnail_size"])
@@ -999,7 +1099,7 @@ class Gallery(QtWidgets.QWidget):
         data.update(newData)
         self.setCurModelConfig(data)
 
-    def changeColor(self, color, alpha):
+    def changeColor(self, color, alpha=1):
         self.color = color
         self.updateCurModelConfig({
             "color": utils.houColorTo255(color),

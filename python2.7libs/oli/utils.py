@@ -220,11 +220,11 @@ def houColorTo255(color):
     :return: tuple(int, int, int)
     """
 
-    return tuple(int(floor(clamp(c, 0, 1) * 255.99)) for c in color.rgb())
+    return tuple(int(floor(clamp(float(c), 0, 1) * 255.99)) for c in color.rgb())
 
 
 def rgb255to01(color):
-    return tuple(clamp(c, 0, 255) / 255 for c in color)
+    return tuple(clamp(float(c), 0, 255) / 255.0 for c in color)
 
 
 def rgb255toHouColor(color):
