@@ -4,8 +4,10 @@ import importlib
 import os
 import time
 import webbrowser
+from collections import defaultdict
 from imp import reload
 
+import PySide2
 import hou
 import toolutils
 from PySide2 import QtGui, QtWidgets, QtCore
@@ -43,6 +45,55 @@ def openGallery(attemptSplit=True):
     return panel
 
 
+class MyDelegate(QtWidgets.QStyledItemDelegate):
+    def __init__(self):
+        super(MyDelegate, self).__init__()
+
+    # def editorEvent(self, event, model, option, index):
+    #     print(event)
+
+    def paint(self, painter, option, index):
+        super(MyDelegate, self).paint(painter, option, index)
+
+        # painter.drawText(option.rect, "OI VINASASASASASASSASI")
+
+        size = 20
+        iconSize = QtCore.QSize(size, size)
+        pad = QtCore.QPoint(int(size/2), int(size/2))
+        rect = QtCore.QRect(option.rect)
+        rect.translate(rect.size().width()-iconSize.width()-pad.x(), pad.y())
+        rect.setSize(QtCore.QSize(iconSize.width(), iconSize.height()))
+
+
+        ol = QtGui.QPixmap(iconsPath + "/ol.png")
+
+        data = index.data(QtCore.Qt.UserRole)
+
+        if "favorite" in data.get("tags", []):
+            fav = hou.qt.Icon("BUTTONS_favorites", iconSize.width(), iconSize.height()).pixmap(iconSize)
+            painter.drawPixmap(rect, fav)
+        elif option.state & QtWidgets.QStyle.State_MouseOver:
+            fav = hou.qt.Icon("BUTTONS_not_favorites", iconSize.width(), iconSize.height()).pixmap(iconSize)
+            painter.drawPixmap(rect, fav)
+
+        painter.save()
+
+
+class TestSite(QtWidgets.QWidget):
+    def __init__(self, parent=None, paneTab=None):
+        super(TestSite, self).__init__(parent)
+        self.paneTab = paneTab
+
+        self.paneTab.showToolbar(True)
+
+        self.layout = QtWidgets.QVBoxLayout(self)
+
+        self.list = QtWidgets.QListView()
+        self.layout.addWidget(self.list)
+
+        self.list.setItemDelegate(MyDelegate())
+
+
 class LoadItemThumbnail(QtCore.QRunnable):
     def __init__(self, item, callback=None):
         self.item = item
@@ -60,7 +111,9 @@ class LoadItemThumbnail(QtCore.QRunnable):
         if not thumbnail_path or not os.path.exists(thumbnail_path):
             return
 
-        self.item.setIcon(QtGui.QIcon(thumbnail_path))
+        pixmap = QtGui.QPixmap(thumbnail_path).scaled(QtCore.QSize(512, 512), QtCore.Qt.KeepAspectRatio)
+
+        self.item.setIcon(pixmap)
 
         if self.callback:
             self.callback()
@@ -77,30 +130,30 @@ class AssetListWidget(object):
         self.target.mimeTypes = self.mimeTypes
         self.target.dropEvent = self.dropEvent
 
-    def mouseMoveEvent(self, e):        
+    def mouseMoveEvent(self, e):
         super(QtWidgets.QListWidget, self.target).mouseMoveEvent(e)
         if self.target._drag:
             self.droppedOut(e)
             self.target._drag = False
 
-    def startDrag(self, actions):        
+    def startDrag(self, actions):
         super(QtWidgets.QListWidget, self.target).startDrag(actions)
         self.target._drag = True
 
     def mimeTypes(self):
         return ['text/plain']
 
-    def dropEvent(self, e):        
+    def dropEvent(self, e):
         self.droppedIn(e)
 
 
 class Gallery(QtWidgets.QWidget):
 
-    def __init__(self, parent=None, pane_tab=None):
+    def __init__(self, parent=None, paneTab=None):
         super(Gallery, self).__init__(parent)
 
-        self.paneTab = pane_tab
-        self.paneTabPwd = pane_tab.pwd()
+        self.paneTab = paneTab
+        self.paneTabPwd = paneTab.pwd()
 
         self.Model = None
 
@@ -115,6 +168,9 @@ class Gallery(QtWidgets.QWidget):
 
         self.ui.assetList.setDragEnabled(True)
         self.ui.assetList.setDragDropMode(QtWidgets.QAbstractItemView.DragDrop)
+
+        self.ui.assetList.setItemDelegate(MyDelegate())
+        self.ui.assetList.setMouseTracking(True)
 
         self.customAssetListWidget = AssetListWidget(self.ui.assetList, self.droppedOut, self.droppedIn)
 
@@ -231,6 +287,9 @@ class Gallery(QtWidgets.QWidget):
             msg += keyname[0].upper() + keyname[1:]
             value = itemData[key]
 
+            if type(value) is not str:
+                continue
+
             style = ""
             if value:
                 value = value.encode('utf-8')
@@ -288,6 +347,12 @@ class Gallery(QtWidgets.QWidget):
             if source is self.ui.assetList:
                 itemList = self.ui.assetList.selectedItems()
                 return self.getModel().assetListContextMenu(event, itemList)
+
+        if event.type() == QtCore.QEvent.KeyPress:
+            text = event.text().strip()
+            if text:
+                self.ui.searchBar.setFocus(QtCore.Qt.ShortcutFocusReason)
+                self.ui.searchBar.setText(self.ui.searchBar.text() + text)
 
         return False
 
@@ -639,9 +704,8 @@ class Gallery(QtWidgets.QWidget):
         :return: None
         """
         rgb = utils.houColorTo255(self.color)
-        bg1 = "#0F1112"
-        bg2 = "#181C1F"
-        bg3 = "#22272B"
+
+        # self.ui.assetList.setUniformItemSizes(True)
 
         self.setStyleSheet("""
             Gallery {{
@@ -1097,6 +1161,29 @@ class Gallery(QtWidgets.QWidget):
         """
         data = self.getCurModelConfig()
         data.update(newData)
+        self.setCurModelConfig(data)
+
+    def assignTag(self, tagName, item):
+        """
+
+        :return:
+        """
+        itemData = item.data(QtCore.Qt.UserRole)
+        itemData.update({
+            "tags": ["favorite", ]
+        })
+        item.setData(QtCore.Qt.UserRole, itemData)
+
+        itemId = self.ui.collectionsBox.currentText() + "/" + item.data(0)
+
+        data = self.getCurModelConfig()
+        if "tags" not in data:
+            data["tags"] = {}
+        if tagName not in data["tags"]:
+            data["tags"][tagName] = []
+        data["tags"][tagName].append(itemId)
+        data["tags"][tagName] = list(dict.fromkeys(data["tags"][tagName]))
+
         self.setCurModelConfig(data)
 
     def changeColor(self, color, alpha=1):

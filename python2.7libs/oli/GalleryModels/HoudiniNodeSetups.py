@@ -152,7 +152,8 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
             "thumbnail_path": thumbnail_path,
             "setup_file": setup_file,
             "info_file": info_file,
-            "category": category
+            "category": category,
+            "tags": []
         })
 
         item = QtWidgets.QListWidgetItem(ag.defaultThumbIcon, itemData["asset_display_name"])

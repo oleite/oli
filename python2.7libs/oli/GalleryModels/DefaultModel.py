@@ -95,6 +95,11 @@ class DefaultModel(object):
             action_open_in_explorer.setProperty("action", "action_open_in_explorer")
             menu.addAction(action_open_in_explorer)
 
+        # Menu Item: Favorite
+        action_favorite = QtWidgets.QAction("Favorite", self.Gallery)
+        action_favorite.setProperty("action", "action_favorite")
+        menu.addAction(action_favorite)
+
         # Open Menu
         menu_exec = menu.exec_(event.globalPos())
         if not menu_exec:
@@ -123,6 +128,10 @@ class DefaultModel(object):
                 # TODO: Make more reliable "Open in Explorer" method
                 directory = self.Gallery.collectionPath + "/" + itemData["asset_name"]
                 os.startfile(directory)
+
+            elif action == "action_favorite":
+                self.Gallery.assignTag("favorite", item)
+
 
         return True
 

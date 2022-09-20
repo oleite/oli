@@ -10,6 +10,7 @@ import pyperclip
 from PySide2 import QtWidgets, QtCore
 from . import DefaultModel
 from .. import lookdev
+from .. import utils
 
 reload(DefaultModel)
 
@@ -216,7 +217,8 @@ class MegascansModel(DefaultModel.DefaultModel):
         #         reload(lookdev)
         #         return lookdev.add_to_ol_instancer(selection[-1], directory)
 
-        save_directory = "U:/oleite/usd"
+        # TODO
+        save_directory = "U:/Gabriel_Leite/usd"
         force_rebuild = False
 
         selection = hou.selectedNodes()
@@ -226,7 +228,7 @@ class MegascansModel(DefaultModel.DefaultModel):
             data = json.load(f)
 
         asset_type = os.path.split(os.path.dirname(asset_directory))[-1]
-        asset_name = lookdev.make_safe(data["name"])
+        asset_name = utils.makeSafe(data["name"])
         asset_name_full = asset_name + "_" + asset_id
 
         asset_save_directory = hou.text.expandString(save_directory + "/" + asset_name_full)
