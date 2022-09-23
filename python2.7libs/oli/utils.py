@@ -3,6 +3,7 @@ import imp
 import os
 import re
 import shutil
+import sys
 import time
 from math import floor
 
@@ -231,3 +232,17 @@ def rgb255to01(color):
 def rgb255toHouColor(color):
     color = rgb255to01(color)
     return hou.Color(color[0], color[1], color[2])
+
+
+class add_path:
+    def __init__(self, path):
+        self.path = path
+
+    def __enter__(self):
+        sys.path.insert(0, self.path)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            sys.path.remove(self.path)
+        except ValueError:
+            pass

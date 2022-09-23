@@ -31,7 +31,7 @@ class Ui_AssetGallery(object):
         self.verticalLayout = QVBoxLayout(self.libraryTab)
         self.verticalLayout.setSpacing(5)
         self.verticalLayout.setObjectName(u"verticalLayout")
-        self.verticalLayout.setContentsMargins(0, 3, 0, 0)
+        self.verticalLayout.setContentsMargins(0, 5, 0, 0)
         self.widget = QWidget(self.libraryTab)
         self.widget.setObjectName(u"widget")
         self.horizontalLayout_2 = QHBoxLayout(self.widget)
@@ -62,6 +62,25 @@ class Ui_AssetGallery(object):
 
         self.horizontalLayout.addWidget(self.searchBar)
 
+        self.toggleFavorites = QToolButton(self.libraryTopBarContainer)
+        self.toggleFavorites.setObjectName(u"toggleFavorites")
+        self.toggleFavorites.setIconSize(QSize(16, 16))
+        self.toggleFavorites.setCheckable(True)
+
+        self.horizontalLayout.addWidget(self.toggleFavorites)
+
+        self.applyTag = QToolButton(self.libraryTopBarContainer)
+        self.applyTag.setObjectName(u"applyTag")
+        self.applyTag.setMaximumSize(QSize(16777214, 16777215))
+        self.applyTag.setIconSize(QSize(16, 16))
+        self.applyTag.setCheckable(True)
+
+        self.horizontalLayout.addWidget(self.applyTag)
+
+        self.horizontalSpacer = QSpacerItem(50, 0, QSizePolicy.Preferred, QSizePolicy.Minimum)
+
+        self.horizontalLayout.addItem(self.horizontalSpacer)
+
         self.thumbnailSizeSlider = QSlider(self.libraryTopBarContainer)
         self.thumbnailSizeSlider.setObjectName(u"thumbnailSizeSlider")
         self.thumbnailSizeSlider.setMinimum(50)
@@ -73,9 +92,6 @@ class Ui_AssetGallery(object):
 
         self.toggleListView = QToolButton(self.libraryTopBarContainer)
         self.toggleListView.setObjectName(u"toggleListView")
-        icon = QIcon()
-        icon.addFile(u"C:/Users/gabriel.leite/.designer/img/list_view.png", QSize(), QIcon.Normal, QIcon.On)
-        self.toggleListView.setIcon(icon)
         self.toggleListView.setIconSize(QSize(16, 16))
         self.toggleListView.setCheckable(True)
 
@@ -146,6 +162,7 @@ class Ui_AssetGallery(object):
         self.rootBox.currentTextChanged.connect(AssetGallery.rootChanged)
         self.foldersTable.itemChanged.connect(AssetGallery.saveState)
         self.tabWidget.currentChanged.connect(AssetGallery.tabChanged)
+        self.toggleFavorites.toggled.connect(AssetGallery.toggleFavoritesOnly)
 
         self.tabWidget.setCurrentIndex(0)
 
@@ -160,7 +177,18 @@ class Ui_AssetGallery(object):
         self.collectionsBox.setCurrentText(QCoreApplication.translate("AssetGallery", u"Collection \u2193 ", None))
         self.searchBar.setPlaceholderText(QCoreApplication.translate("AssetGallery", u"Search string or Pattern (Eg.: tree*01)", None))
 #if QT_CONFIG(tooltip)
-        self.thumbnailSizeSlider.setToolTip(QCoreApplication.translate("AssetGallery", u"<html><head/><body><p>Changes the thumbnail sizes</p></body></html>", u"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
+        self.toggleFavorites.setToolTip(QCoreApplication.translate("AssetGallery", u"Isolate Favorites", None))
+#endif // QT_CONFIG(tooltip)
+        self.toggleFavorites.setText("")
+#if QT_CONFIG(tooltip)
+        self.applyTag.setToolTip(QCoreApplication.translate("AssetGallery", u"Isolate items tagged as...", None))
+#endif // QT_CONFIG(tooltip)
+#if QT_CONFIG(accessibility)
+        self.applyTag.setAccessibleName("")
+#endif // QT_CONFIG(accessibility)
+        self.applyTag.setText(QCoreApplication.translate("AssetGallery", u"TAG", None))
+#if QT_CONFIG(tooltip)
+        self.thumbnailSizeSlider.setToolTip(QCoreApplication.translate("AssetGallery", u"Changes the thumbnail sizes", u"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
 #endif // QT_CONFIG(tooltip)
 #if QT_CONFIG(statustip)
         self.thumbnailSizeSlider.setStatusTip("")
@@ -169,7 +197,7 @@ class Ui_AssetGallery(object):
         self.thumbnailSizeSlider.setWhatsThis("")
 #endif // QT_CONFIG(whatsthis)
 #if QT_CONFIG(tooltip)
-        self.toggleListView.setToolTip(QCoreApplication.translate("AssetGallery", u"<html><head/><body><p>Toggles between the List and Grid view modes</p></body></html>", None))
+        self.toggleListView.setToolTip(QCoreApplication.translate("AssetGallery", u"Toggles between the List and Grid view modes", None))
 #endif // QT_CONFIG(tooltip)
         self.toggleListView.setText("")
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.libraryTab), QCoreApplication.translate("AssetGallery", u"Library", None))

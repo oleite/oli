@@ -63,7 +63,13 @@ class MegascansModel(DefaultModel.DefaultModel):
         # Menu Item: import_all
         action_import_all = QtWidgets.QAction("Import", self.Gallery)
         action_import_all.setProperty("action", "import_all")
+        font = action_import_all.font()
+        font.setBold(True)
+        action_import_all.setFont(font)
         menu.addAction(action_import_all)
+
+        # Separator
+        menu.addSeparator()
 
         # Menu Item: import_all_scatter
         action_import_all_scatter = QtWidgets.QAction("Import and Scatter", self.Gallery)
@@ -74,13 +80,6 @@ class MegascansModel(DefaultModel.DefaultModel):
         action_add_to_layout_asset_gallery = QtWidgets.QAction("Add to Layout Asset Gallery", self.Gallery)
         action_add_to_layout_asset_gallery.setProperty("action", "add_to_layout_asset_gallery")
         menu.addAction(action_add_to_layout_asset_gallery)
-
-        if self.Gallery.currentRootModel == "cb_asset_collections":
-            # Menu Item: import_mats_styles
-            action_import_mats_styles = QtWidgets.QAction(u"Import Lookdev (Materials + Style Sheets)",
-                                                          self.Gallery)
-            action_import_mats_styles.setProperty("action", "import_mats_styles")
-            menu.addAction(action_import_mats_styles)
 
         # Only show if single item selected
         if len(itemList) == 1:
@@ -185,20 +184,23 @@ class MegascansModel(DefaultModel.DefaultModel):
         with open(hou.text.expandString(ms_json_path), "r") as f:
             ms_dict = json.load(f)
 
+        display_name = ms_dict["semanticTags"]["name"] + " " + ms_dict["id"]
+
         itemData.update({
             "ms_json_path": ms_json_path,
-            "asset_display_name": ms_dict["semanticTags"]["name"] + " " + ms_dict["id"],
+            "asset_name": display_name,
             "thumbnail_path": self.Gallery.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/*_Preview.png"),
             "ms_id": ms_dict["id"],
+            "tags": self.Gallery.getTagsFromId(self.Gallery.ui.collectionsBox.currentText() + "/" + display_name),
         })
 
         geometry_pattern = "__ROOT__/__COLLECTION__/__ASSET__/*.abc"
         geometry_path = self.Gallery.format_pattern(asset_name, geometry_pattern)
 
-        item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_display_name"])
+        item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_name"])
         item.setData(QtCore.Qt.UserRole, itemData)
-        item.setToolTip(self.Gallery.generateItemTooltip(itemData))
 
+        self.Gallery.updateItemTooltip(item)
         self.Gallery.ui.assetList.addItem(item)
 
         return item
@@ -277,7 +279,7 @@ class MegascansModel(DefaultModel.DefaultModel):
 
         sendcommand.parm("commandstring").set('''
 import hou
-from olcb import build_asset
+from oli import build_asset
 
 hou.hipFile.save("''' + asset_save_directory + '''/''' + asset_name_full + '''.hip", False)
 

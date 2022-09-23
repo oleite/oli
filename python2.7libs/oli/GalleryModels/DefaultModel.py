@@ -95,11 +95,6 @@ class DefaultModel(object):
             action_open_in_explorer.setProperty("action", "action_open_in_explorer")
             menu.addAction(action_open_in_explorer)
 
-        # Menu Item: Favorite
-        action_favorite = QtWidgets.QAction("Favorite", self.Gallery)
-        action_favorite.setProperty("action", "action_favorite")
-        menu.addAction(action_favorite)
-
         # Open Menu
         menu_exec = menu.exec_(event.globalPos())
         if not menu_exec:
@@ -129,13 +124,9 @@ class DefaultModel(object):
                 directory = self.Gallery.collectionPath + "/" + itemData["asset_name"]
                 os.startfile(directory)
 
-            elif action == "action_favorite":
-                self.Gallery.assignTag("favorite", item)
-
-
         return True
 
-    def filterItem(self, item, text):
+    def filterItem(self, item, text=None):
         itemData = item.data(QtCore.Qt.UserRole)
 
         item.setHidden(False)
@@ -145,6 +136,10 @@ class DefaultModel(object):
                 item.setHidden(not hou.text.patternMatch(text, item.data(0), ignore_case=True))
             else:
                 item.setHidden(text.lower() not in item.data(0).lower())
+
+        if self.Gallery.ui.toggleFavorites.isChecked() and "favorite" not in self.Gallery.getTags(item):
+            item.setHidden(True)
+
 
     def createItems(self):
         """
@@ -165,7 +160,7 @@ class DefaultModel(object):
             if not item:
                 continue
             items.append(item)
-            self.Gallery.threadPool.start(self.Gallery.LoadItemThumbnail(item, self.Gallery.thumbnailLoaded))
+            self.Gallery.threadPool.start(self.Gallery.LoadItemThumbnail(item, self.Gallery))
 
         self.Gallery.filterItems()
         return items
@@ -179,8 +174,8 @@ class DefaultModel(object):
 
         item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_display_name"])
         item.setData(QtCore.Qt.UserRole, itemData)
-        item.setToolTip(self.Gallery.generateItemTooltip(itemData))
 
+        self.Gallery.updateItemTooltip(item)
         self.Gallery.ui.assetList.addItem(item)
 
         return item
@@ -199,7 +194,7 @@ class DefaultModel(object):
             if "geometry_path" in itemData and itemData["geometry_path"]:
                 # LOP Sublayer
                 node = toolutils.activePane([]).pwd()
-                n_sublayer = node.createNode("sublayer", lookdev.make_safe(collection + "__" + asset_name))
+                n_sublayer = node.createNode("sublayer", utils.makeSafe(collection + "__" + asset_name))
                 n_sublayer.parm("filepath1").set(itemData["geometry_path"])
                 n_sublayer.setSelected(True, True)
                 n_sublayer.setGenericFlag(hou.nodeFlag.Display, True)
