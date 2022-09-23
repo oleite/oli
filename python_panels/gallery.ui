@@ -46,7 +46,7 @@
         <number>0</number>
        </property>
        <property name="topMargin">
-        <number>3</number>
+        <number>5</number>
        </property>
        <property name="rightMargin">
         <number>0</number>
@@ -108,14 +108,77 @@
           <item>
            <widget class="QLineEdit" name="searchBar">
             <property name="placeholderText">
-             <string>Search String or Pattern (Eg.: Soldado*A001)</string>
+             <string>Search string or Pattern (Eg.: tree*01)</string>
             </property>
            </widget>
           </item>
           <item>
+           <widget class="QToolButton" name="toggleFavorites">
+            <property name="toolTip">
+             <string>Isolate Favorites</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>16</width>
+              <height>16</height>
+             </size>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="applyTag">
+            <property name="maximumSize">
+             <size>
+              <width>16777214</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="toolTip">
+             <string>Isolate items tagged as...</string>
+            </property>
+            <property name="accessibleName">
+             <string/>
+            </property>
+            <property name="text">
+             <string>TAG</string>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>16</width>
+              <height>16</height>
+             </size>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeType">
+             <enum>QSizePolicy::Preferred</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>50</width>
+              <height>0</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
            <widget class="QSlider" name="thumbnailSizeSlider">
             <property name="toolTip">
-             <string comment="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" extracomment="AAAAAAAAAAAA">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Changes the thumbnail sizes&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             <string comment="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" extracomment="AAAAAAAAAAAA">Changes the thumbnail sizes</string>
             </property>
             <property name="statusTip">
              <string comment="BBBBBBBBBBBBBBBBBB" extracomment="BBBBBBBBBBBBBBBBBBBB"/>
@@ -140,15 +203,10 @@
           <item>
            <widget class="QToolButton" name="toggleListView">
             <property name="toolTip">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Toggles between the List and Grid view modes&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             <string>Toggles between the List and Grid view modes</string>
             </property>
             <property name="text">
              <string/>
-            </property>
-            <property name="icon">
-             <iconset>
-              <normalon>C:/Users/gabriel.leite/.designer/img/list_view.png</normalon>
-             </iconset>
             </property>
             <property name="iconSize">
              <size>
@@ -314,8 +372,8 @@
    <slot>thumbnailResize()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>354</x>
-     <y>59</y>
+     <x>582</x>
+     <y>70</y>
     </hint>
     <hint type="destinationlabel">
      <x>240</x>
@@ -346,8 +404,8 @@
    <slot>toggleListView()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>611</x>
-     <y>59</y>
+     <x>610</x>
+     <y>76</y>
     </hint>
     <hint type="destinationlabel">
      <x>501</x>
@@ -435,6 +493,22 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>toggleFavorites</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>toggleFavoritesOnly()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>292</x>
+     <y>68</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>779</x>
+     <y>41</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <slot>updateParms()</slot>
@@ -450,5 +524,6 @@
   <slot>loadState()</slot>
   <slot>rootChanged()</slot>
   <slot>tabChanged()</slot>
+  <slot>toggleFavoritesOnly()</slot>
  </slots>
 </ui>

@@ -6,12 +6,12 @@ import time
 import webbrowser
 from imp import reload
 
+import PySide2
 import hou
 import toolutils
 from PySide2 import QtGui, QtWidgets, QtCore
 import json
 
-import GalleryModels
 import galleryUi
 import lookdev
 import utils
@@ -43,26 +43,133 @@ def openGallery(attemptSplit=True):
     return panel
 
 
+def rectShrink(rect, x, y):
+    shrink = QtCore.QPoint(x, y)
+    rect.setTopLeft(rect.topLeft() + shrink)
+    rect.setBottomRight(rect.bottomRight() - shrink)
+    return rect
+
+
+class MyDelegate(QtWidgets.QStyledItemDelegate):
+    def __init__(self, Gallery):
+        super(MyDelegate, self).__init__()
+
+        self.Gallery = Gallery
+
+        size = 25
+        self.iconSize = QtCore.QSize(size, size)
+        self.pad = QtCore.QPoint(int(size / 2), int(size / 2))
+
+    def favIconRect(self, rect):
+        size = rect.size()
+        rect.setSize(QtCore.QSize(self.iconSize.width(), self.iconSize.height()))
+        rect.translate(size.width()-self.iconSize.width()-self.pad.x(), self.pad.y())
+        return rect
+
+    def favIconBoundsRect(self, rect):
+        size = rect.size()
+        padx = self.pad.x() * 2
+        pady = self.pad.y() * 2
+        rect.setSize(QtCore.QSize(self.iconSize.width() + padx, self.iconSize.height() + pady))
+        rect.translate(size.width() - self.iconSize.width() - padx, 0)
+        return rect
+
+    def editorEvent(self, event, model, option, index):
+        if event.type() == QtCore.QEvent.MouseButtonRelease:
+            if self.favIconBoundsRect(rectShrink(option.rect, 5, 5)).contains(event.pos()):
+                self.Gallery.toggledFavorite(index.row())
+                return True
+        return False
+
+    def paint(self, painter, option, index):
+        data = index.data(QtCore.Qt.UserRole)
+        tags = data.get("tags", [])
+        item = self.Gallery.ui.assetList.item(index.row())
+
+        mouseOver = option.state & QtWidgets.QStyle.State_MouseOver
+
+        # SHRINK RECT
+        option.rect = rectShrink(option.rect, 5, 5)
+
+        bgPath = QtGui.QPainterPath()
+        bgPath.addRoundedRect(option.rect, 5, 5)
+
+        bgColor = QtGui.QColor("#252525")
+        bgColor2 = QtGui.QColor("#091A2D")
+        galColor = hou.qt.toQColor(self.Gallery.color)
+
+        grad = QtGui.QLinearGradient(option.rect.topLeft(), option.rect.bottomLeft())
+        grad.setColorAt(0, QtGui.QColor(0, 0, 0, 0))
+        grad.setColorAt(1, QtGui.QColor(0, 0, 0, 100))
+
+        if item.isSelected():
+            painter.fillPath(bgPath, bgColor2)
+            painter.fillPath(bgPath, grad)
+        else:
+            painter.fillPath(bgPath, bgColor)
+
+        pixmap = item.data(QtCore.Qt.UserRole+1)
+        if pixmap:
+            size = option.rect.size()
+            size.setHeight(size.height() - 40)
+
+            pixmap = pixmap.scaled(size, QtCore.Qt.KeepAspectRatio)
+            pos = option.rect.topLeft()
+            pos += QtCore.QPoint((pixmap.width() - size.width())/-2, (pixmap.width() - pixmap.height())/2.0)
+            painter.drawPixmap(pos, pixmap)
+
+            if mouseOver:
+                painter.fillPath(bgPath, grad)
+
+        font = hou.qt.mainWindow().font()
+        if item.isSelected() or mouseOver:
+
+            font.setBold(True)
+        painter.setFont(font)
+        flags = QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter | QtCore.Qt.TextWordWrap
+        painter.drawText(option.rect, flags, item.data(0))
+
+        if tags and "favorite" in tags:
+            fav = hou.qt.Icon("BUTTONS_favorites", self.iconSize.width(), self.iconSize.height()).pixmap(self.iconSize)
+            painter.drawPixmap(self.favIconRect(option.rect), fav)
+        elif mouseOver:
+            fav = hou.qt.Icon("BUTTONS_not_favorites", self.iconSize.width(), self.iconSize.height()).pixmap(self.iconSize)
+            painter.drawPixmap(self.favIconRect(option.rect), fav)
+
+
+        painter.save()
+
+    def displayText(self, value, locale):
+        return ""
+
+
 class LoadItemThumbnail(QtCore.QRunnable):
-    def __init__(self, item, callback=None):
+    def __init__(self, item, Gallery=None):
         self.item = item
-        self.callback = callback
+        self.Gallery = Gallery
         super(LoadItemThumbnail, self).__init__()
+        self.fallbackIcon = QtGui.QIcon(iconsPath + "/default_thumbnail.png")
 
     def run(self):
         time.sleep(0.01)  # For some reason QPixmap hangs houdini if this line isn't present (?????)
-        if not self.item:
-            return
 
-        thumbnail_path = self.item.data(QtCore.Qt.UserRole)["thumbnail_path"]
+        if not self.item:
+            return self.fallbackIcon
+        try:
+            thumbnail_path = self.item.data(QtCore.Qt.UserRole)["thumbnail_path"]
+            thumbnail_path = hou.text.expandString(thumbnail_path)
+        except Exception as e:
+            return self.fallbackIcon
 
         if not thumbnail_path or not os.path.exists(thumbnail_path):
-            return
+            return self.fallbackIcon
 
-        self.item.setIcon(QtGui.QIcon(thumbnail_path))
+        pixmap = QtGui.QPixmap(thumbnail_path).scaled(QtCore.QSize(512, 512), QtCore.Qt.KeepAspectRatio)
 
-        if self.callback:
-            self.callback()
+        self.item.setData(QtCore.Qt.UserRole+1, pixmap)
+        # self.item.setIcon(pixmap)
+        if self.Gallery:
+            self.Gallery.filterItems()
 
 
 class AssetListWidget(object):
@@ -76,32 +183,34 @@ class AssetListWidget(object):
         self.target.mimeTypes = self.mimeTypes
         self.target.dropEvent = self.dropEvent
 
-    def mouseMoveEvent(self, e):        
+    def mouseMoveEvent(self, e):
         super(QtWidgets.QListWidget, self.target).mouseMoveEvent(e)
         if self.target._drag:
             self.droppedOut(e)
             self.target._drag = False
 
-    def startDrag(self, actions):        
+    def startDrag(self, actions):
         super(QtWidgets.QListWidget, self.target).startDrag(actions)
         self.target._drag = True
 
     def mimeTypes(self):
         return ['text/plain']
 
-    def dropEvent(self, e):        
+    def dropEvent(self, e):
         self.droppedIn(e)
 
 
 class Gallery(QtWidgets.QWidget):
 
-    def __init__(self, parent=None, pane_tab=None):
+    def __init__(self, parent=None, paneTab=None):
         super(Gallery, self).__init__(parent)
 
-        self.paneTab = pane_tab
-        self.paneTabPwd = pane_tab.pwd()
+        self.paneTab = paneTab
+        self.paneTabPwd = paneTab.pwd()
 
         self.Model = None
+
+        self.debug = bool(hou.getenv("OLI_DEBUG"))
 
         self.currentRootModel = None
         self.collectionPath = ""
@@ -113,11 +222,16 @@ class Gallery(QtWidgets.QWidget):
         self.ui.assetList.setDragEnabled(True)
         self.ui.assetList.setDragDropMode(QtWidgets.QAbstractItemView.DragDrop)
 
+        self.itemDelegate = MyDelegate(self)
+        self.ui.assetList.setItemDelegate(self.itemDelegate)
+        self.ui.assetList.setMouseTracking(True)
+
         self.customAssetListWidget = AssetListWidget(self.ui.assetList, self.droppedOut, self.droppedIn)
 
         self.LoadItemThumbnail = LoadItemThumbnail
         self.thumbnailLoadedCount = 0
 
+        self.color = hou.Color()
         self.applyStyles()
 
         self.threadPool = QtCore.QThreadPool()
@@ -125,6 +239,9 @@ class Gallery(QtWidgets.QWidget):
         self.defaultThumbIcon = QtGui.QIcon(iconsPath + "/default_thumbnail.png")
         self.ui.toggleListView.setIcon(QtGui.QIcon(iconsPath + "/list_view.png"))
         self.ui.toggleListView.setIconSize(QtCore.QSize(30, 30))
+
+        self.ui.toggleFavorites.setIcon(hou.qt.Icon("BUTTONS_not_favorites", 30, 30))
+        self.ui.toggleFavorites.setIconSize(QtCore.QSize(30, 30))
 
         self.preferencesFile = hou.getenv("HOUDINI_USER_PREF_DIR") + "/oli_gallery_prefs.json"
         self.defaultPreferencesFile = str(hou.getenv("OLI_ROOT")) + "/oli_gallery_prefs.json"
@@ -161,6 +278,9 @@ class Gallery(QtWidgets.QWidget):
             self.loadDefaultFolders()
             self.ui.tabWidget.setCurrentIndex(0)
 
+        if self.debug:
+            self.paneTab.showToolbar(True)
+
     def getModel(self, modelName=None):
         """
         Gets the current Asset Gallery Model according to the model_name.
@@ -191,6 +311,22 @@ class Gallery(QtWidgets.QWidget):
         if current_model_name == modelName:
             Model = self.Model
             return Model
+
+        # galleryModelsRootList = []
+        # galleryModelsRootList.append(hou.getenv("OLI_ROOT") + "/python2.7libs/oli/GalleryModels")
+        # for modelsRoot in galleryModelsRootList:
+        #     if not os.path.exists(modelsRoot):
+        #         continue
+        #     with utils.add_path(modelsRoot):
+        #         #print(GalleryModels.MegascansModel)
+        #
+        #
+        #         try:
+        #             mod = importlib.import_module(".", "GalleryModels")
+        #             print(mod)
+        #         except Exception as e:
+        #             print(e)
+        #         pass
 
         try:
             modelModule = importlib.import_module(".GalleryModels." + modelName, package="oli")
@@ -223,16 +359,23 @@ class Gallery(QtWidgets.QWidget):
             keyname = key.replace("_", " ")
             msg += keyname[0].upper() + keyname[1:]
             value = itemData[key]
-
             style = ""
             if value:
-                value = value.encode('utf-8')
+                if type(value) is str:
+                    pass
+                    # value = value.encode('utf-8')
+                elif type(value) is list:
+                    value = ", ".join(value)
                 style = "font-weight:bold;"
             else:
                 style += "color:red"
 
             msg += ":<br><span style=\"{}\">{}</span><br><br>".format(style, value)
         return msg.strip("<br>")
+
+    def updateItemTooltip(self, item):
+        itemData = item.data(QtCore.Qt.UserRole)
+        item.setToolTip(self.generateItemTooltip(itemData))
 
     @staticmethod
     def getModelsNames():
@@ -281,6 +424,12 @@ class Gallery(QtWidgets.QWidget):
             if source is self.ui.assetList:
                 itemList = self.ui.assetList.selectedItems()
                 return self.getModel().assetListContextMenu(event, itemList)
+
+        if event.type() == QtCore.QEvent.KeyPress:
+            text = event.text().strip()
+            # if text:
+            #     self.ui.searchBar.setFocus(QtCore.Qt.ShortcutFocusReason)
+            #     self.ui.searchBar.setText(self.ui.searchBar.text() + text)
 
         return False
 
@@ -412,13 +561,26 @@ class Gallery(QtWidgets.QWidget):
 
         for row in range(self.ui.foldersTable.rowCount()):
             root = self.ui.foldersTable.item(row, 0).text()
-            root = hou.text.expandString(root)
+            root = root
             self.ui.rootBox.addItem(root)
 
+            # Add Model Icons
             modelIconPath = iconsPath + "/" + self.ui.foldersTable.item(row, 1).text() + "*"
-            modelIconPath = utils.patternMatchFile(modelIconPath)
+            modelIconPath = utils.patternMatchFile(hou.text.expandString(modelIconPath))
             if os.path.exists(modelIconPath):
                 self.ui.rootBox.setItemIcon(self.ui.rootBox.count()-1, QtGui.QIcon(modelIconPath))
+
+            # Add Colors to the rooBox
+            with open(self.preferencesFile, "r") as f:
+                try:
+                    data = json.load(f)
+                except ValueError:
+                    pass
+            try:
+                rgb = data["folders"][root]["config"]["color"]
+                self.ui.rootBox.setItemData(row, QtGui.QColor(rgb[0], rgb[1], rgb[2]), QtCore.Qt.ForegroundRole)
+            except KeyError:
+                pass
 
         self.loadStateRoot()
         self.ui.rootBox.blockSignals(False)
@@ -429,6 +591,7 @@ class Gallery(QtWidgets.QWidget):
 
         :return: None
         """
+        self.setMessage("")
         self.loadState()
         self.saveState()
 
@@ -442,10 +605,14 @@ class Gallery(QtWidgets.QWidget):
         if not block_signals:
             self.ui.collectionsBox.blockSignals(False)
 
+        self.ui.collectionsBox.setDisabled(False)
+
         Model = self.getModel()
         collections_list = Model.collectionsList()
         if not collections_list:
             collections_list = [""]
+            self.ui.collectionsBox.setDisabled(True)
+            self.setMessage("No collection found")
         self.ui.collectionsBox.addItems(sorted(collections_list))
 
     def collectionChanged(self, save_state=True):
@@ -506,6 +673,7 @@ class Gallery(QtWidgets.QWidget):
                 "__ASSET__": asset_name,
             }
         for key in remappings:
+            key = hou.text.expandString(key)
             path = path.replace(key, remappings[key])
 
         path = utils.patternMatchFile(path)
@@ -520,7 +688,7 @@ class Gallery(QtWidgets.QWidget):
         :return: None
         """
 
-        font_h = 30
+        font_h = hou.qt.mainWindow().font().pixelSize()
         # if self.ui.assetList.count() > 0:
         #     font = self.ui.assetList.item(0).font()
         #     if ListMode:
@@ -528,12 +696,18 @@ class Gallery(QtWidgets.QWidget):
         #         font.setBold(True)
         #     font_h = QtGui.QFontMetricsF(font).height()
 
+        # # ========================
+        # #        SNAP
+        # listWidth = self.ui.assetList.width() - font_h
+        # targetItemCount = listWidth / val
+        # val = listWidth / targetItemCount
+
         if ListMode:
             self.ui.assetList.setIconSize(QtCore.QSize(font_h, font_h))
-            self.ui.assetList.setGridSize(QtCore.QSize(0, font_h))
+            self.ui.assetList.setGridSize(QtCore.QSize(0, font_h*2))
         else:
-            self.ui.assetList.setIconSize(QtCore.QSize(val - 3, val))
-            self.ui.assetList.setGridSize(QtCore.QSize(val, val + (font_h * 2)))
+            self.ui.assetList.setIconSize(QtCore.QSize(val, val))
+            self.ui.assetList.setGridSize(QtCore.QSize(val, val+font_h))
 
     def toggleListView(self, ListMode):
         """
@@ -558,6 +732,16 @@ class Gallery(QtWidgets.QWidget):
 
         self.ui.toggleListView.blockSignals(False)
         self.saveState()
+
+    def toggleFavoritesOnly(self, on):
+        size = self.ui.toggleFavorites.iconSize()
+        if on:
+            self.ui.toggleFavorites.setIcon(hou.qt.Icon("BUTTONS_favorites", size.height(), size.width()))
+        else:
+            self.ui.toggleFavorites.setIcon(hou.qt.Icon("BUTTONS_not_favorites", size.height(), size.width()))
+
+        self.filterItems()
+        return
 
     def import_asset(self, item):
         """
@@ -612,57 +796,152 @@ class Gallery(QtWidgets.QWidget):
 
         :return: None
         """
+        rgb = utils.houColorTo255(self.color)
 
-        self.ui.toggleListView.setStyleSheet("""
-            QToolButton {
+        # self.ui.assetList.setUniformItemSizes(True)
+
+        self.setStyleSheet("""
+            Gallery {{
+                background: #2e2e2e;
                 border: 0;
-                background: #333;
-                padding: 5px 15px;
-            }
-            QToolButton::hover {
-                background: #555
-            }
-            QToolButton:checked {
+            }}
+                        
+            libraryTab {{
+                border: 0;
+            }}
+            
+            QTabWidget::pane {{
+            }}
+            QTabWidget::tab-bar {{
+                border: 0;
+            }}
+            
+            QTabBar::tab {{
+                border: 1px solid transparent;
+                border-radius: 5px 5px 0 0;
+                background: #2e2e2e;
+                padding: 0px 30px;
+            }}
+            QTabBar::tab::selected {{
+                background: #444;
+                font-weight: bold;
+            }}
+            
+            QLineEdit {{
+                padding: 7px;
+                border: 1px solid transparent;
+                border-bottom: 3px;
+                border-radius: 5px;
+            }}
+            QLineEdit::focus {{
+                border-bottom: 3px solid rgba({r},{g},{b},.5);
+            }}
+
+            
+            QComboBox {{
+                border: 1px solid transparent;
+                border-radius: 5px;
                 background: #222;
-            }
-        """)
+            }}
+            QComboBox::drop-down {{
+                min-width: 50px;
+            }}
+            QComboBox::hover {{
+                background: #2e2e2e;
+            }}
+            
+            QToolButton {{
+                border: 0;
+                background: transparent;
+                padding: 5px 10px;
+                margin: 0;
+                color: #999;
+                font-weight: bold;
+            }}
+            QToolButton::hover {{
+                background: #444;
+            }}
+            QToolButton:checked {{
+                background: #2e2e2e;
+            }}
+            
+            QLabel {{
+                padding: 0;
+                margin: 0;
+            }}
+        """.format(r=rgb[0], g=rgb[1], b=rgb[2]))
 
         self.ui.assetList.setStyleSheet("""
-        QListWidget::item:selected {
-            background-color: rgba(2,38,99,.3);
-            border: 0;
-        }
-        QToolTip {
-            padding: 6px;
-        }
-        QListWidget[ListMode="true"] {
-            color: red;
-            background-color: red;
-        }
-        """)
+            QListWidget {{
+                background-color: #222;
+            }}
+            
+            QListWidget::item {{
+                background-color: #252525;
+                margin: 5px;
+                border: 0px solid transparent;
+                border-radius: 5px;
+            }}
+        
+            QListWidget::item:selected {{
+                background-color: rgba({r},{g},{b},.2);
+                border: 1px;
+            }}
+            QToolTip {{
+                padding: 6px;
+            }}
+            QListWidget[ListMode="true"] {{
+                color: red;
+                background-color: red;
+            }}
+        """.format(r=rgb[0], g=rgb[1], b=rgb[2]))
 
-        self.ui.thumbnailSizeSlider.setStyleSheet("""
-            QSlider::groove {
-                padding: 2px 0 2px 0;
-                margin: 2px 0;
-            }
-            QSlider::handle {
+        self.ui.thumbnailSizeSlider.setStyleSheet("""        
+            QSlider::groove {{
+                padding: 0;
+                margin: 0;
+            
+                height: 20px;
+                border: 1px solid transparent;
+                border-radius: 5px;
+                background: transparent;
+            }}
+
+            QSlider::handle {{
+                padding: 0;
+                margin: -1px 0;
+                
+                background: #4a4a4a;
                 width: 50px;
-            }
-            QSlider::add-page {
-                /* */
-            }
+                border: 1px solid transparent;
+                border-radius: 5px;
+            }}
+            QSlider::handle:hover {{
+                background: #666;
+            }}
 
-            QSlider::handle:disabled {
-                background: #535454;
-            }
-            QSlider::groove:disabled {
+            QSlider::add-page {{
+                padding: 0;
+                margin: 1px 0;
+            
                 background: #222;
-            }
-            QSlider::sub-page:disabled {
-                background: #535454;
-            }
-        """)
+                border: 1px solid transparent;
+                border-radius: 5px;
+            }}
+
+            QSlider::sub-page {{
+                padding: 0;
+                margin: 1px 0;
+            
+                background: #222;
+                border: 1px solid transparent;
+                border-radius: 5px;
+            }}
+
+            QSlider::handle:disabled {{
+                background: #333;
+            }}
+        """.format(r=rgb[0], g=rgb[1], b=rgb[2]))
 
         self.ui.messageBrowser.document().setDefaultStyleSheet("""
             body {
@@ -674,6 +953,10 @@ class Gallery(QtWidgets.QWidget):
             .error {
                 color: red;
             }
+        """)
+
+        self.ui.rootBox.setStyleSheet("""
+                
         """)
 
     def saveState(self, e=None, preferencesFile=None):
@@ -750,8 +1033,11 @@ class Gallery(QtWidgets.QWidget):
         if "folders" in data:
             root = self.ui.rootBox.currentText()
             if root in data["folders"] and "config" in data["folders"][root]:
-                if "last_collection" in data["folders"][root]["config"]:
-                    self.ui.collectionsBox.setCurrentText(data["folders"][root]["config"]["last_collection"])
+                config = data["folders"][root]["config"]
+                if "last_collection" in config:
+                    self.ui.collectionsBox.setCurrentText(config["last_collection"])
+                if "color" in config:
+                    self.changeColor(utils.rgb255toHouColor(config["color"]))
 
         if "thumbnail_size" in data:
             self.ui.thumbnailSizeSlider.setValue(data["thumbnail_size"])
@@ -790,7 +1076,6 @@ class Gallery(QtWidgets.QWidget):
 
         if "last_root" in data:
             last_root = data["last_root"]
-            last_root = hou.text.expandString(last_root)
             if self.ui.rootBox.findText(last_root) != -1:
                 self.ui.rootBox.setCurrentText(last_root)
 
@@ -812,7 +1097,7 @@ class Gallery(QtWidgets.QWidget):
             with open(preferencesFile, "r") as f:
                 try:
                     data = json.load(f)
-                except ValueError:
+                except ValueError as e:
                     return False
         else:
             self.updateParms()
@@ -959,3 +1244,93 @@ class Gallery(QtWidgets.QWidget):
                 config_item.setText(json.dumps(data, indent=4, sort_keys=True))
                 self.saveState()
                 return
+
+    def updateCurModelConfig(self, newData):
+        """
+
+        :param newData:
+        :return:
+        """
+        data = self.getCurModelConfig()
+        data.update(newData)
+        self.setCurModelConfig(data)
+
+    def tagItem(self, tagName, item, on=True):
+        """
+
+        :return:
+        """
+        # =========================
+        # Update current session's Item Data
+
+        itemData = item.data(QtCore.Qt.UserRole)
+        tags = itemData.get("tags", [])
+
+        if on:
+            tags.append(tagName)
+        elif tagName in tags:
+            tags.remove(tagName)
+
+        itemData["tags"] = tags
+        item.setData(QtCore.Qt.UserRole, itemData)
+        self.updateItemTooltip(item)
+
+        # =========================
+        # Update Model Config State
+
+        itemId = self.ui.collectionsBox.currentText() + "/" + item.data(0)
+        itemId = itemId.strip()
+
+        data = self.getCurModelConfig()
+
+        if on:
+            if "tags" not in data:
+                data["tags"] = {}
+            if tagName not in data["tags"]:
+                data["tags"][tagName] = []
+            data["tags"][tagName].append(itemId)
+            data["tags"][tagName] = list(dict.fromkeys(data["tags"][tagName]))
+        else:
+            if tagName in data.get("tags", {}):
+                if itemId in data["tags"][tagName]:
+                    data["tags"][tagName].remove(itemId)
+
+        self.setCurModelConfig(data)
+
+    def tagItemToggle(self, tagName, item):
+        on = True
+        if tagName in self.getTags(item):
+            on = False
+        self.tagItem(tagName, item, on)
+
+    def getTags(self, item):
+        itemId = self.ui.collectionsBox.currentText() + "/" + item.data(0)
+        return self.getTagsFromId(itemId)
+
+    def getTagsFromId(self, itemId):
+        itemId = itemId.strip()
+        data = self.getCurModelConfig()
+
+        tags = []
+        for tag, targets in data.get("tags", {}).items():
+            if itemId in targets:
+                tags.append(tag)
+        return tags
+
+    def toggledFavorite(self, row):
+        item = self.ui.assetList.item(row)
+        itemList = self.ui.assetList.selectedItems()
+        if item not in itemList:
+            itemList.append(item)
+        for item in itemList:
+            self.tagItemToggle("favorite", item)
+
+        self.filterItems()
+
+    def changeColor(self, color, alpha=1):
+        self.color = color
+        self.updateCurModelConfig({
+            "color": utils.houColorTo255(color),
+        })
+
+        self.applyStyles()

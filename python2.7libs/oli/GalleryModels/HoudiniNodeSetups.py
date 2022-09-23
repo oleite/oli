@@ -102,7 +102,8 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
         elif action == "action_create_collection":
             collection = hou.ui.readInput("Collection Name")[1]
             if collection:
-                os.makedirs(self.Gallery.ui.rootBox.currentText() + "/" + collection)
+                os.makedirs(hou.text.expandString(self.Gallery.ui.rootBox.currentText() + "/" + collection))
+                self.Gallery.setMessage("")
                 self.Gallery.loadState()
 
         elif action == "action_refresh":
@@ -117,21 +118,20 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
         if asset_name == ".backup":
             return None
 
-        ag = self.Gallery
         itemData = {}
 
-        thumbnail_path = ag.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/thumbnail.jpg")
-        if not os.path.isfile(thumbnail_path):
+        thumbnail_path = self.Gallery.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/thumbnail.jpg")
+        if not os.path.isfile(hou.text.expandString(thumbnail_path)):
             thumbnail_path = None
 
-        setup_file = ag.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/__ASSET__.hns")
-        if not os.path.isfile(setup_file):
+        setup_file = self.Gallery.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/__ASSET__.hns")
+        if not os.path.isfile(hou.text.expandString(setup_file)):
             setup_file = None
 
-        info_file = ag.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/info.json")
-        if os.path.isfile(info_file):
+        info_file = self.Gallery.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/info.json")
+        if os.path.isfile(hou.text.expandString(info_file)):
             itemData["info_file"] = info_file
-            with io.open(info_file, "r", encoding='utf8') as f:
+            with io.open(hou.text.expandString(info_file), "r", encoding='utf8') as f:
                 info = json.load(f)
                 itemData.update(info)
         else:
@@ -151,14 +151,15 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
             "thumbnail_path": thumbnail_path,
             "setup_file": setup_file,
             "info_file": info_file,
-            "category": category
+            "category": category,
+            "tags": self.Gallery.getTagsFromId(self.Gallery.ui.collectionsBox.currentText() + "/" + display_name),
         })
 
-        item = QtWidgets.QListWidgetItem(ag.defaultThumbIcon, itemData["asset_display_name"])
+        item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_display_name"])
         item.setData(QtCore.Qt.UserRole, itemData)
-        item.setToolTip(self.Gallery.generateItemTooltip(itemData))
 
-        ag.ui.assetList.addItem(item)
+        self.Gallery.updateItemTooltip(item)
+        self.Gallery.ui.assetList.addItem(item)
         return item
 
     def importAsset(self, item):
@@ -167,7 +168,7 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
 
         itemData = item.data(QtCore.Qt.UserRole)
 
-        setup_file = itemData["setup_file"]
+        setup_file = hou.text.expandString(itemData["setup_file"])
         category = itemData["category"]
 
         if parent.childTypeCategory().name() != category:
@@ -218,7 +219,7 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
         if not asset_display_name:
             return False
 
-        asset_name = lookdev.make_safe(asset_display_name)
+        asset_name = utils.makeSafe(asset_display_name)
         directory = ag.collectionPath + "/" + asset_name
 
         if os.path.exists(directory):
@@ -255,8 +256,6 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
             f.write(json.dumps(info, indent=4))
 
         self.refresh()
-        # item = self.createItem(asset_name)
-        # ag.thread_pool.start(asset_gallery.LoadItemThumbnail(item))
 
     def droppedOut(self, event):
         ag = self.Gallery
@@ -274,7 +273,7 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
                 for item in ag.ui.assetList.selectedItems():
                     itemData = item.data(QtCore.Qt.UserRole)
 
-                    setup_file = itemData["setup_file"]
+                    setup_file = hou.text.expandString(itemData["setup_file"])
                     category = itemData["category"]
 
                     if parent.childTypeCategory().name() != category:
@@ -345,13 +344,16 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
             self.Gallery.filterItems()
 
         # Update foldersTable Config
+        self.Gallery.updateCurModelConfig({
+
+        })
         data = self.Gallery.getCurModelConfig()
         data.update({
             "show_all": self.show_all
         })
         self.Gallery.setCurModelConfig(data)
 
-    def filterItem(self, item, text):
+    def filterItem(self, item, text=None):
         super(HoudiniNodeSetups, self).filterItem(item, text)
 
         if not self.show_all:

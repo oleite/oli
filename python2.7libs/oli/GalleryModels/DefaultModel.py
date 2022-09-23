@@ -126,7 +126,7 @@ class DefaultModel(object):
 
         return True
 
-    def filterItem(self, item, text):
+    def filterItem(self, item, text=None):
         itemData = item.data(QtCore.Qt.UserRole)
 
         item.setHidden(False)
@@ -137,6 +137,10 @@ class DefaultModel(object):
             else:
                 item.setHidden(text.lower() not in item.data(0).lower())
 
+        if self.Gallery.ui.toggleFavorites.isChecked() and "favorite" not in self.Gallery.getTags(item):
+            item.setHidden(True)
+
+
     def createItems(self):
         """
         Creates each item inside of the assetList from scratch.
@@ -144,6 +148,7 @@ class DefaultModel(object):
         :return: List of QListWidgetItems
         """
         self.Gallery.ui.assetList.clear()
+
         if not os.path.exists(self.Gallery.collectionPath):
             return
 
@@ -155,7 +160,7 @@ class DefaultModel(object):
             if not item:
                 continue
             items.append(item)
-            self.Gallery.threadPool.start(self.Gallery.LoadItemThumbnail(item, self.Gallery.thumbnailLoaded))
+            self.Gallery.threadPool.start(self.Gallery.LoadItemThumbnail(item, self.Gallery))
 
         self.Gallery.filterItems()
         return items
@@ -169,8 +174,8 @@ class DefaultModel(object):
 
         item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_display_name"])
         item.setData(QtCore.Qt.UserRole, itemData)
-        item.setToolTip(self.Gallery.generateItemTooltip(itemData))
 
+        self.Gallery.updateItemTooltip(item)
         self.Gallery.ui.assetList.addItem(item)
 
         return item
@@ -189,7 +194,7 @@ class DefaultModel(object):
             if "geometry_path" in itemData and itemData["geometry_path"]:
                 # LOP Sublayer
                 node = toolutils.activePane([]).pwd()
-                n_sublayer = node.createNode("sublayer", lookdev.make_safe(collection + "__" + asset_name))
+                n_sublayer = node.createNode("sublayer", utils.makeSafe(collection + "__" + asset_name))
                 n_sublayer.parm("filepath1").set(itemData["geometry_path"])
                 n_sublayer.setSelected(True, True)
                 n_sublayer.setGenericFlag(hou.nodeFlag.Display, True)
@@ -247,7 +252,7 @@ class DefaultModel(object):
 
     def collectionsList(self):
         self.Gallery.ui.assetList.clear()
-        root = self.Gallery.ui.rootBox.currentText()
+        root = hou.text.expandString(self.Gallery.ui.rootBox.currentText())
         if os.path.exists(root):
             collections_list = next(os.walk(root))[1]
             return collections_list
@@ -269,6 +274,7 @@ class DefaultModel(object):
                 break
 
         self.Gallery.collectionPath = self.Gallery.ui.rootBox.currentText() + "/" + collection
+        self.Gallery.collectionPath = hou.text.expandString(self.Gallery.collectionPath)
         self.Gallery.createItems()
 
     def refresh(self):

@@ -5,28 +5,14 @@
  used by the application.  Note, that two definitions of the
  same interface or of the interfaces menu are not allowed
  in a single file. -->
-  <interface name="oli::gallery" label="oli Gallery" icon="MISC_python" showNetworkNavigationBar="false" help_url="">
-    <script><![CDATA[########################################################################
-# Replace the sample code below with your own to create a
-# PyQt5 or PySide2 interface.  Your code must define an
-# onCreateInterface() function that returns the root widget of
-# your interface.
-#
-# The 'hutil.Qt' is for internal-use only.
-# It is a wrapper module that enables the sample code below to work with
-# either a Qt4 or Qt5 environment for backwards-compatibility.
-#
-# When developing your own Python Panel, import directly from PySide2
-# or PyQt5 instead of from 'hutil.Qt'.
-########################################################################
-
-from imp import reload
+  <interface name="oli::gallery" label="oli Gallery" icon="$OLI_ROOT/icons/ol.png" showNetworkNavigationBar="false" help_url="">
+    <script><![CDATA[from imp import reload
 from oli import gallery
 
 def onCreateInterface():
     reload(gallery)
-    return gallery.Gallery(pane_tab=kwargs["paneTab"])]]></script>
-    <includeInToolbarMenu menu_position="415" create_separator="false"/>
+    return gallery.Gallery(paneTab=kwargs["paneTab"])]]></script>
+    <includeInToolbarMenu menu_position="419" create_separator="false"/>
     <help><![CDATA[]]></help>
   </interface>
 </pythonPanelDocument>

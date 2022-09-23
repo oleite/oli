@@ -1,8 +1,12 @@
+import collections
 import imp
 import os
 import re
 import shutil
+import sys
 import time
+from math import floor
+
 import toolutils
 import hou
 
@@ -195,3 +199,50 @@ def selectAnyFromTree(path_list, exclusive=True):
 
     choices = list(dict.fromkeys(choices))  # Remove duplicates
     return hou.ui.selectFromTree(choices, exclusive=exclusive)
+
+
+def clamp(val, val_min, val_max):
+    """
+    Clamps val between val_min and val_max
+
+    :param val: Value to be clamped
+    :param val_min: Target minimum value for val
+    :param val_max: Target maximum value for val
+    :return: Clamped value
+    """
+
+    return min(val_max, max(val_min, val))
+
+
+def houColorTo255(color):
+    """
+    Converts floating 0-1 hou.Color RGB to 0-255 int tuple RGB
+
+    :param color: hou.Color
+    :return: tuple(int, int, int)
+    """
+
+    return tuple(int(floor(clamp(float(c), 0, 1) * 255.99)) for c in color.rgb())
+
+
+def rgb255to01(color):
+    return tuple(clamp(float(c), 0, 255) / 255.0 for c in color)
+
+
+def rgb255toHouColor(color):
+    color = rgb255to01(color)
+    return hou.Color(color[0], color[1], color[2])
+
+
+class add_path:
+    def __init__(self, path):
+        self.path = path
+
+    def __enter__(self):
+        sys.path.insert(0, self.path)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            sys.path.remove(self.path)
+        except ValueError:
+            pass

@@ -10,6 +10,7 @@ import pyperclip
 from PySide2 import QtWidgets, QtCore
 from . import DefaultModel
 from .. import lookdev
+from .. import utils
 
 reload(DefaultModel)
 
@@ -17,10 +18,6 @@ reload(DefaultModel)
 class MegascansModel(DefaultModel.DefaultModel):
     def __init__(self, ag):
         super(MegascansModel, self).__init__(ag)
-
-        if hou.applicationVersion()[0] < 19:
-            self.valid = False
-            self.Gallery.setMessage('<span class="error">MegascansModel só é suportado a partir do Houdini 19</span>')
 
     def assetListContextMenu(self, event, itemList):
         if not self.valid:
@@ -39,6 +36,11 @@ class MegascansModel(DefaultModel.DefaultModel):
             action_refresh.setProperty("action", "action_refresh")
             menu.addAction(action_refresh)
 
+            # Menu Item: Change Color
+            action_change_color = QtWidgets.QAction("Change Color", self.Gallery)
+            action_change_color.setProperty("action", "action_change_color")
+            menu.addAction(action_change_color)
+
             # Open Menu
             menu_exec = menu.exec_(event.globalPos())
             if not menu_exec:
@@ -53,12 +55,21 @@ class MegascansModel(DefaultModel.DefaultModel):
             elif action == "action_refresh":
                 self.refresh()
 
+            elif action == "action_change_color":
+                hou.ui.openColorEditor(self.Gallery.changeColor, initial_color=self.Gallery.color)
+
             return True
 
         # Menu Item: import_all
         action_import_all = QtWidgets.QAction("Import", self.Gallery)
         action_import_all.setProperty("action", "import_all")
+        font = action_import_all.font()
+        font.setBold(True)
+        action_import_all.setFont(font)
         menu.addAction(action_import_all)
+
+        # Separator
+        menu.addSeparator()
 
         # Menu Item: import_all_scatter
         action_import_all_scatter = QtWidgets.QAction("Import and Scatter", self.Gallery)
@@ -69,13 +80,6 @@ class MegascansModel(DefaultModel.DefaultModel):
         action_add_to_layout_asset_gallery = QtWidgets.QAction("Add to Layout Asset Gallery", self.Gallery)
         action_add_to_layout_asset_gallery.setProperty("action", "add_to_layout_asset_gallery")
         menu.addAction(action_add_to_layout_asset_gallery)
-
-        if self.Gallery.currentRootModel == "cb_asset_collections":
-            # Menu Item: import_mats_styles
-            action_import_mats_styles = QtWidgets.QAction(u"Import Lookdev (Materials + Style Sheets)",
-                                                          self.Gallery)
-            action_import_mats_styles.setProperty("action", "import_mats_styles")
-            menu.addAction(action_import_mats_styles)
 
         # Only show if single item selected
         if len(itemList) == 1:
@@ -174,23 +178,29 @@ class MegascansModel(DefaultModel.DefaultModel):
         }
 
         ms_json_path = self.Gallery.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/*.json")
-        with open(ms_json_path, "r") as f:
+        if not os.path.isfile(ms_json_path):
+            return
+
+        with open(hou.text.expandString(ms_json_path), "r") as f:
             ms_dict = json.load(f)
+
+        display_name = ms_dict["semanticTags"]["name"] + " " + ms_dict["id"]
 
         itemData.update({
             "ms_json_path": ms_json_path,
-            "asset_display_name": ms_dict["semanticTags"]["name"] + " " + ms_dict["id"],
+            "asset_name": display_name,
             "thumbnail_path": self.Gallery.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/*_Preview.png"),
             "ms_id": ms_dict["id"],
+            "tags": self.Gallery.getTagsFromId(self.Gallery.ui.collectionsBox.currentText() + "/" + display_name),
         })
 
         geometry_pattern = "__ROOT__/__COLLECTION__/__ASSET__/*.abc"
         geometry_path = self.Gallery.format_pattern(asset_name, geometry_pattern)
 
-        item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_display_name"])
+        item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_name"])
         item.setData(QtCore.Qt.UserRole, itemData)
-        item.setToolTip(self.Gallery.generateItemTooltip(itemData))
 
+        self.Gallery.updateItemTooltip(item)
         self.Gallery.ui.assetList.addItem(item)
 
         return item
@@ -209,20 +219,21 @@ class MegascansModel(DefaultModel.DefaultModel):
         #         reload(lookdev)
         #         return lookdev.add_to_ol_instancer(selection[-1], directory)
 
-        save_directory = "U:/oleite/usd"
+        # TODO
+        save_directory = "U:/Gabriel_Leite/usd"
         force_rebuild = False
 
         selection = hou.selectedNodes()
         asset_id = asset_directory.split("_")[-1]
 
-        with open(asset_directory + "/" + asset_id + ".json") as f:
+        with open(hou.text.expandString(itemData["ms_json_path"])) as f:
             data = json.load(f)
 
         asset_type = os.path.split(os.path.dirname(asset_directory))[-1]
-        asset_name = lookdev.make_safe(data["name"])
+        asset_name = utils.makeSafe(data["name"])
         asset_name_full = asset_name + "_" + asset_id
 
-        asset_save_directory = save_directory + "/" + asset_name_full
+        asset_save_directory = hou.text.expandString(save_directory + "/" + asset_name_full)
         if not os.path.exists(asset_save_directory):
             os.makedirs(asset_save_directory)
 
@@ -268,7 +279,7 @@ class MegascansModel(DefaultModel.DefaultModel):
 
         sendcommand.parm("commandstring").set('''
 import hou
-from olcb import build_asset
+from oli import build_asset
 
 hou.hipFile.save("''' + asset_save_directory + '''/''' + asset_name_full + '''.hip", False)
 
@@ -290,3 +301,10 @@ hou.hipFile.save()
         topnet.parm("cookbutton").pressButton()
 
         return assetreference
+
+    def collectionChanged(self):
+        super(MegascansModel, self).collectionChanged()
+
+        if hou.applicationVersion()[0] < 19:
+            self.valid = False
+            self.Gallery.setMessage('<span class="error">MegascansModel só é suportado a partir do Houdini 19</span>')

@@ -3,20 +3,13 @@
 # Created By: Gabriel O. Leite
 # Created Date: 2022-05-26
 # ----------------------------------------------------------------------------
-import difflib
 import os
-import pickle
 import shutil
 
 import hou
 import json
-import re
-import time
-import cbFramework as cbFramework
 
-# from __init__ import utils.makeSafe
-# import utils.makeSafe
-import toolutils
+import utils
 
 
 def copy_folder(src, dst, symlinks=False, ignore=None):

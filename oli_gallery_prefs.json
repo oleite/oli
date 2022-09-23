@@ -1,6 +1,10 @@
 {
     "folders": {
-        "U:/oleite/MEGASCANS_Library/Downloaded": {
+        "$HOME/my_node_setups" : {
+            "model": "HoudiniNodeSetups",
+            "config": "{}"
+        },
+        "U:/Gabriel_Leite/MEGASCANS_Library/Downloaded": {
             "model": "MegascansModel",
             "config": "{}"
         },
@@ -8,6 +12,6 @@
             "model": "HoudiniNodeSetups",
             "config": "{}"
         }
-    }, 
+    },
     "last_root": "$OLI_ROOT/node_setups"
 }
