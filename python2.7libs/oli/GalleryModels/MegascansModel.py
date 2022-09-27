@@ -8,9 +8,9 @@ from imp import reload
 
 import pyperclip
 from PySide2 import QtWidgets, QtCore
-from . import DefaultModel
-from .. import lookdev
-from .. import utils
+from oli.GalleryModels import DefaultModel
+from oli import lookdev
+from oli import utils
 
 reload(DefaultModel)
 

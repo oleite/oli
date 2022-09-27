@@ -6,9 +6,7 @@ import toolutils
 from PySide2 import QtWidgets, QtCore
 import pyperclip
 
-from .. import lookdev
-from .. import gallery
-from .. import utils
+from oli import utils
 
 
 class DefaultModel(object):
@@ -160,7 +158,7 @@ class DefaultModel(object):
             if not item:
                 continue
             items.append(item)
-            self.Gallery.threadPool.start(self.Gallery.LoadItemThumbnail(item, self.Gallery))
+            self.Gallery.threadPool.start(self.Gallery.LoadItemThumbnail(item))
 
         self.Gallery.filterItems()
         return items

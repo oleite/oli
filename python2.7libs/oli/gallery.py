@@ -2,6 +2,7 @@
 
 import importlib
 import os
+import sys
 import time
 import webbrowser
 from imp import reload
@@ -122,12 +123,12 @@ class MyDelegate(QtWidgets.QStyledItemDelegate):
                 painter.fillPath(bgPath, grad)
 
         font = hou.qt.mainWindow().font()
+        painter.setPen(QtGui.QColor("#ddd"))
         if item.isSelected() or mouseOver:
-
             font.setBold(True)
         painter.setFont(font)
         flags = QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter | QtCore.Qt.TextWordWrap
-        painter.drawText(option.rect, flags, item.data(0))
+        painter.drawText(rectShrink(option.rect, 5, 5), flags, item.data(0))
 
         if tags and "favorite" in tags:
             fav = hou.qt.Icon("BUTTONS_favorites", self.iconSize.width(), self.iconSize.height()).pixmap(self.iconSize)
@@ -135,41 +136,6 @@ class MyDelegate(QtWidgets.QStyledItemDelegate):
         elif mouseOver:
             fav = hou.qt.Icon("BUTTONS_not_favorites", self.iconSize.width(), self.iconSize.height()).pixmap(self.iconSize)
             painter.drawPixmap(self.favIconRect(option.rect), fav)
-
-
-        painter.save()
-
-    def displayText(self, value, locale):
-        return ""
-
-
-class LoadItemThumbnail(QtCore.QRunnable):
-    def __init__(self, item, Gallery=None):
-        self.item = item
-        self.Gallery = Gallery
-        super(LoadItemThumbnail, self).__init__()
-        self.fallbackIcon = QtGui.QIcon(iconsPath + "/default_thumbnail.png")
-
-    def run(self):
-        time.sleep(0.01)  # For some reason QPixmap hangs houdini if this line isn't present (?????)
-
-        if not self.item:
-            return self.fallbackIcon
-        try:
-            thumbnail_path = self.item.data(QtCore.Qt.UserRole)["thumbnail_path"]
-            thumbnail_path = hou.text.expandString(thumbnail_path)
-        except Exception as e:
-            return self.fallbackIcon
-
-        if not thumbnail_path or not os.path.exists(thumbnail_path):
-            return self.fallbackIcon
-
-        pixmap = QtGui.QPixmap(thumbnail_path).scaled(QtCore.QSize(512, 512), QtCore.Qt.KeepAspectRatio)
-
-        self.item.setData(QtCore.Qt.UserRole+1, pixmap)
-        # self.item.setIcon(pixmap)
-        if self.Gallery:
-            self.Gallery.filterItems()
 
 
 class AssetListWidget(object):
@@ -198,6 +164,30 @@ class AssetListWidget(object):
 
     def dropEvent(self, e):
         self.droppedIn(e)
+
+
+class LoadItemThumbnail(QtCore.QRunnable):
+    def __init__(self, item):
+        self.item = item
+        super(LoadItemThumbnail, self).__init__()
+        self.fallbackIcon = QtGui.QIcon(iconsPath + "/default_thumbnail.png")
+
+    def run(self):
+        time.sleep(0.01)  # For some reason QPixmap hangs houdini if this line isn't present (?????)
+
+        if not self.item:
+            return self.fallbackIcon
+        try:
+            thumbnail_path = self.item.data(QtCore.Qt.UserRole)["thumbnail_path"]
+            thumbnail_path = hou.text.expandString(thumbnail_path)
+        except Exception as e:
+            return self.fallbackIcon
+
+        if not thumbnail_path or not os.path.exists(thumbnail_path):
+            return self.fallbackIcon
+
+        pixmap = QtGui.QPixmap(thumbnail_path).scaled(QtCore.QSize(512, 512), QtCore.Qt.KeepAspectRatio)
+        self.item.setData(QtCore.Qt.UserRole+1, pixmap)
 
 
 class Gallery(QtWidgets.QWidget):
@@ -306,43 +296,51 @@ class Gallery(QtWidgets.QWidget):
         if not modelName:
             modelName = defaultModelName
 
-        current_model_name = type(self.Model).__name__
-
-        if current_model_name == modelName:
+        curModelName = type(self.Model).__name__
+        if curModelName == modelName:
             Model = self.Model
             return Model
 
-        # galleryModelsRootList = []
-        # galleryModelsRootList.append(hou.getenv("OLI_ROOT") + "/python2.7libs/oli/GalleryModels")
+        def getClassFromFile(parentModuleDir, className):
+            if not os.path.exists(parentModuleDir):
+                return
+
+            with utils.add_path(parentModuleDir):
+                availableModels = []
+                for filename in os.listdir(parentModuleDir):
+                    if "__" not in filename and os.path.isfile(parentModuleDir + "/" + filename):
+                        availableModels.append(os.path.splitext(filename)[0])
+
+                if className in availableModels:
+                    module = importlib.import_module(className)
+                    reload(module)
+                    _class = getattr(module, className)
+                    return _class
+
+        # TODO: $OLI_GALLERY_MODELS_PATH
+        # galleryModelsPATHList = hou.getenv("OLI_GALLERY_MODELS_PATH").split(";")
+        galleryModelsPATHList = []
+        galleryModelsPATHList.append(hou.getenv("OLI_ROOT") + "/python2.7libs/oli/GalleryModels")
+
+        for PATH in galleryModelsPATHList:
+            modelClass = getClassFromFile(PATH, modelName)
+            if not modelClass:
+                continue
+
+            self.Model = modelClass(self)
+            return self.Model
+        return self.getModel(defaultModelName)
+
+    def getModelsIcons(self):
+        modelsIcons = {}
+        galleryModelsRootList = []
+        galleryModelsRootList.append(hou.getenv("OLI_ROOT") + "/python2.7libs/oli/GalleryModels")
+
         # for modelsRoot in galleryModelsRootList:
-        #     if not os.path.exists(modelsRoot):
-        #         continue
-        #     with utils.add_path(modelsRoot):
-        #         #print(GalleryModels.MegascansModel)
-        #
-        #
-        #         try:
-        #             mod = importlib.import_module(".", "GalleryModels")
-        #             print(mod)
-        #         except Exception as e:
-        #             print(e)
-        #         pass
-
-        try:
-            modelModule = importlib.import_module(".GalleryModels." + modelName, package="oli")
-        except ImportError:
-            warning = '<span class="error">\"{}\" model not found</span>'.format(modelName)
-            modelName = defaultModelName
-            modelModule = importlib.import_module(".GalleryModels." + modelName, package="oli")
-
-        reload(modelModule)
-        Model = getattr(modelModule, modelName)(self)
-
-        if warning:
-            self.setMessage(warning)
-
-        self.Model = Model
-        return self.Model
+        #     availableModels = []
+        #     for filename in os.listdir(modelsRoot):
+        #         if "__" not in filename and os.path.isfile(modelsRoot + "/" + filename):
+        #             availableModels.append(os.path.splitext(filename)[0])
 
     @staticmethod
     def generateItemTooltip(itemData):

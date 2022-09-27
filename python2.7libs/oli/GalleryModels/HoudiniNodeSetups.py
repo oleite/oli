@@ -12,10 +12,8 @@ from imp import reload
 import toolutils
 from PySide2 import QtWidgets, QtCore
 
-from .. import utils
-from . import DefaultModel
-from .. import lookdev
-from .. import gallery
+from oli import utils
+from oli.GalleryModels import DefaultModel
 
 reload(DefaultModel)
 
