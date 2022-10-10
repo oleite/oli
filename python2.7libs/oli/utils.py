@@ -168,6 +168,10 @@ def normpath(path):
     return path
 
 
+def join(path, *paths):
+    return normpath(os.path.join(path, *paths))
+
+
 def makeSafe(text):
     """
     Makes a text safe by replacing special characters and spaces by underscores, so that
@@ -246,3 +250,16 @@ class add_path:
             sys.path.remove(self.path)
         except ValueError:
             pass
+
+
+def envListValues(name):
+    value = hou.getenv(name, "").strip().strip("&").strip(";")
+    return [val for val in value.split(";") if val]
+
+
+def envAddValue(name, value):
+    valueList = envListValues(name)
+    valueList.append(value)
+    finalString = ";".join(valueList)
+    hou.putenv(name, finalString)
+    return finalString

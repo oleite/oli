@@ -21,7 +21,7 @@ import utils
 iconsPath = hou.getenv("OLI_ICONS")
 
 
-def openGallery(attemptSplit=True):
+def openGallery(attemptSplit=True, **kwargs):
     """
     Opens the oli Gallery
 
@@ -192,15 +192,15 @@ class LoadItemThumbnail(QtCore.QRunnable):
 
 class Gallery(QtWidgets.QWidget):
 
-    def __init__(self, parent=None, paneTab=None):
+    def __init__(self, parent=None, paneTab=None, **kwargs):
         super(Gallery, self).__init__(parent)
 
         self.paneTab = paneTab
-        self.paneTabPwd = paneTab.pwd()
+        self.paneTabPwd = paneTab.pwd() if paneTab else None
 
         self.Model = None
 
-        self.debug = bool(hou.getenv("OLI_DEBUG"))
+        self.debug = hou.getenv("OLI_DEBUG", "0").lower() in ["true", "1", "t"]
 
         self.currentRootModel = None
         self.collectionPath = ""
@@ -233,8 +233,8 @@ class Gallery(QtWidgets.QWidget):
         self.ui.toggleFavorites.setIcon(hou.qt.Icon("BUTTONS_not_favorites", 30, 30))
         self.ui.toggleFavorites.setIconSize(QtCore.QSize(30, 30))
 
-        self.preferencesFile = hou.getenv("HOUDINI_USER_PREF_DIR") + "/oli_gallery_prefs.json"
-        self.defaultPreferencesFile = str(hou.getenv("OLI_ROOT")) + "/oli_gallery_prefs.json"
+        self.preferencesFile = kwargs.get("preferencesFile", hou.getenv("HOUDINI_USER_PREF_DIR") + "/oli_gallery_prefs.json")
+        self.defaultPreferencesFile = kwargs.get("defaultPreferencesFile", str(hou.getenv("OLI_ROOT")) + "/oli_gallery_prefs.json")
 
         # Ensure valid Preferences File
         if os.path.isfile(self.preferencesFile):
@@ -247,7 +247,7 @@ class Gallery(QtWidgets.QWidget):
                                           severity=hou.severityType.Error,
                                           title="Asset Gallery"
                                           )
-                    if hou.ui.displayConfirmation("Resetar arquivo de preferências?", title="Asset Gallery"):
+                    if hou.ui.displayConfirmation("Reset preferences file to the defaults?", title="Gallery"):
                         with open(self.preferencesFile, "w") as f2:
                             json.dump({}, f2, sort_keys=True)
                     else:
@@ -257,6 +257,7 @@ class Gallery(QtWidgets.QWidget):
 
         self.loadMessage()
 
+    def initialize(self):
         self.ui.thumbnailSizeSlider.setValue(200)
         self.updateRootBox()
 
@@ -317,11 +318,7 @@ class Gallery(QtWidgets.QWidget):
                     _class = getattr(module, className)
                     return _class
 
-        # TODO: $OLI_GALLERY_MODELS_PATH
-        # galleryModelsPATHList = hou.getenv("OLI_GALLERY_MODELS_PATH").split(";")
-        galleryModelsPATHList = []
-        galleryModelsPATHList.append(hou.getenv("OLI_ROOT") + "/python2.7libs/oli/GalleryModels")
-
+        galleryModelsPATHList = utils.envListValues("OLI_GALLERY_MODELS_PATH")
         for PATH in galleryModelsPATHList:
             modelClass = getClassFromFile(PATH, modelName)
             if not modelClass:
@@ -329,18 +326,46 @@ class Gallery(QtWidgets.QWidget):
 
             self.Model = modelClass(self)
             return self.Model
+
+        warning = '<span class="error">\"{}\" model not found</span>'.format(modelName)
+        self.setMessage(warning)
         return self.getModel(defaultModelName)
 
-    def getModelsIcons(self):
-        modelsIcons = {}
-        galleryModelsRootList = []
-        galleryModelsRootList.append(hou.getenv("OLI_ROOT") + "/python2.7libs/oli/GalleryModels")
+    def getModelsData(self):
+        modelFileList = []
+        data = {}
 
-        # for modelsRoot in galleryModelsRootList:
-        #     availableModels = []
-        #     for filename in os.listdir(modelsRoot):
-        #         if "__" not in filename and os.path.isfile(modelsRoot + "/" + filename):
-        #             availableModels.append(os.path.splitext(filename)[0])
+        for PATH in utils.envListValues("OLI_GALLERY_MODELS_PATH"):
+
+            for filename in os.listdir(PATH):
+                filepath = utils.join(PATH, filename)
+                # filename = filename.split(".")[0]
+                if os.path.isfile(filepath) and not filename.startswith("__"):
+                    name = os.path.splitext(os.path.basename(filepath))[0]
+                    modelInfo = data.get(name, {})
+                    modelInfo["file"] = filepath
+                    data[name] = modelInfo
+
+            iconsDir = utils.join(PATH, "icons")
+            if os.path.isdir(iconsDir):
+                for filename in os.listdir(iconsDir):
+                    filepath = utils.join(iconsDir, filename)
+                    if os.path.isfile(filepath):
+                        name = os.path.splitext(os.path.basename(filepath))[0]
+                        if name in data:
+                            data[name]["icon"] = filepath
+
+        return data
+
+    def getModelIconFromRoot(self, root):
+        for row in range(self.ui.foldersTable.rowCount()):
+            tableRoot = self.ui.foldersTable.item(row, 0).text()
+            tableModel = self.ui.foldersTable.item(row, 1).text()
+
+            if root == tableRoot:
+                data = self.getModelsData()
+                return data.get(tableModel, {}).get("icon", "")
+        return ""
 
     @staticmethod
     def generateItemTooltip(itemData):
@@ -375,21 +400,6 @@ class Gallery(QtWidgets.QWidget):
         itemData = item.data(QtCore.Qt.UserRole)
         item.setToolTip(self.generateItemTooltip(itemData))
 
-    @staticmethod
-    def getModelsNames():
-        """
-        Retrieves the available Gallery Models inside the GalleryModels package.
-
-        :return: List of strings of the module names
-        """
-        models = []
-        for name in os.listdir(GalleryModels.__path__[0]):
-            name = name.split(".")[0]
-            if name.startswith("__") or name in models:
-                continue
-            models.append(name)
-        return sorted(models)
-
     def droppedOut(self, event):
         """
         Called when the user drags and drops an assetList item outside
@@ -415,8 +425,6 @@ class Gallery(QtWidgets.QWidget):
         Monitors and handles incoming events
         """
 
-        self.paneTabPwdUpdater()
-
         # ContextMenu
         if event.type() == QtCore.QEvent.ContextMenu:
             if source is self.ui.assetList:
@@ -431,24 +439,11 @@ class Gallery(QtWidgets.QWidget):
 
         return False
 
-    def paneTabPwdUpdater(self):
-        """
-        Callback to be on every tick, checking if the Pane Tab pwd() has changed.
-        If so, calls the Model.pwdChanged(old, new) method.
+    def onNodePathChanged(self, node):
+        Model = self.getModel()
+        Model.pwdChanged(self.paneTabPwd, self.paneTab.pwd())
 
-        :return: Whether to stop the callback
-        """
-        try:
-            if self.paneTab.pwd() == self.paneTabPwd:
-                return False
-
-            Model = self.getModel()
-            Model.pwdChanged(self.paneTabPwd, self.paneTab.pwd())
-
-            self.paneTabPwd = self.paneTab.pwd()
-            return False
-        except:
-            return True
+        self.paneTabPwd = self.paneTab.pwd()
 
     def spawnFoldersTableContextMenu(self):
         """
@@ -464,7 +459,7 @@ class Gallery(QtWidgets.QWidget):
         if itemList:
             # Submenu: Change model to
             menu_model = menu.addMenu("Change model to")
-            for model in self.getModelsNames():
+            for model in self.getModelsData():
                 action_model = QtWidgets.QAction(model, self)
                 action_model.setProperty("action", "change_model")
                 action_model.setProperty("model", model)
@@ -562,9 +557,8 @@ class Gallery(QtWidgets.QWidget):
             root = root
             self.ui.rootBox.addItem(root)
 
-            # Add Model Icons
-            modelIconPath = iconsPath + "/" + self.ui.foldersTable.item(row, 1).text() + "*"
-            modelIconPath = utils.patternMatchFile(hou.text.expandString(modelIconPath))
+            # Add Model Icon
+            modelIconPath = self.getModelIconFromRoot(root)
             if os.path.exists(modelIconPath):
                 self.ui.rootBox.setItemIcon(self.ui.rootBox.count()-1, QtGui.QIcon(modelIconPath))
 

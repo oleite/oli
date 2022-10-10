@@ -2,7 +2,7 @@ import itertools
 import os
 import hou
 
-from .lookdev import make_safe
+from utils import makeSafe
 
 
 def storeNodePos(node):
@@ -24,7 +24,7 @@ def separate_alembic(directory=""):
     if not directory or not os.path.exists(directory):
         return False
 
-    sopnet = hou.node("obj").createNode("geo", make_safe(directory))
+    sopnet = hou.node("obj").createNode("geo", makeSafe(directory))
     sopnet.moveToGoodPosition()
 
     x = 0
@@ -52,12 +52,12 @@ def separate_alembic(directory=""):
         for geoname in geoname_list:
             pattern = "/" + geoname + "/*"
 
-            split = sopnet.createNode("split", "split_" + make_safe(geoname))
+            split = sopnet.createNode("split", "split_" + makeSafe(geoname))
             split.setPosition((x, -1))
             storeNodePos(split)
             split.parm("group").set("@path=" + pattern)
 
-            in_node = split.createOutputNode("null", "IN_" + make_safe(geoname))
+            in_node = split.createOutputNode("null", "IN_" + makeSafe(geoname))
             in_node.setPosition((x, -3))
             storeNodePos(in_node)
 
@@ -112,9 +112,9 @@ def separate_into_materials(root=""):
             if root:
                 pattern = "*" + root + pattern
 
-            _name = make_safe(pattern.split("/")[-2].split(":")[-1])
+            _name = makeSafe(pattern.split("/")[-2].split(":")[-1])
 
-            split = parent.createNode("split", "split_" + make_safe(geoname))
+            split = parent.createNode("split", "split_" + makeSafe(geoname))
             split.setPosition((x, y - 1))
             storeNodePos(split)
             split.parm("group").set("@path=" + pattern)

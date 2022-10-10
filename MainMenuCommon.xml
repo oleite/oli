@@ -3,6 +3,10 @@
 <mainMenu>
   <menuBar>
     <subMenu>
+      <context>
+        <expression>hou.getenv("OLI_HIDE_MENU_MAIN", "0").lower() not in ["true", "1", "t"]</expression>
+      </context>
+
       <insertBefore>help_menu</insertBefore>
       <label>oli</label>
 
