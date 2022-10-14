@@ -359,3 +359,22 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
             itemData = item.data(QtCore.Qt.UserRole)
             if itemData["category"] != current_category:
                 item.setHidden(True)
+
+    def itemBadges(self, item, size=128):
+        itemData = item.data(QtCore.Qt.UserRole)
+        cat = itemData["category"]
+        badgeList = []
+
+        qtSize = QtCore.QSize(size, size)
+
+        def addHIcon(name):
+            badgeList.append(hou.qt.Icon(name, size, size).pixmap(qtSize))
+
+        if cat == "Sop":
+            addHIcon("OBJ_geo")
+        elif cat == "Object":
+            addHIcon("NETWORKS_scene")
+        elif cat == "Vop":
+            addHIcon("NETWORKS_vop")
+
+        return badgeList

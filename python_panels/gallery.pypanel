@@ -9,13 +9,17 @@
     <script><![CDATA[from imp import reload
 from oli import gallery
 from oli import utils
+import json
 
 def onCreateInterface():
     global Gallery
     
     reload(gallery)
     
-    galleryKwargs = {}
+    try:
+        galleryKwargs = json.loads(hou.getenv("OLI_GALLERY_KWARGS"))
+    except:
+        galleryKwargs = {}
     
     Gallery = gallery.Gallery(paneTab=kwargs["paneTab"], **galleryKwargs)
     return Gallery

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'gallery.ui'
+## Form generated from reading UI file 'galleryUi.ui'
 ##
 ## Created by: Qt User Interface Compiler version 5.15.2
 ##
@@ -32,25 +32,26 @@ class Ui_AssetGallery(object):
         self.verticalLayout.setSpacing(5)
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.verticalLayout.setContentsMargins(0, 5, 0, 0)
-        self.widget = QWidget(self.libraryTab)
-        self.widget.setObjectName(u"widget")
-        self.horizontalLayout_2 = QHBoxLayout(self.widget)
+        self.topNavContainer = QWidget(self.libraryTab)
+        self.topNavContainer.setObjectName(u"topNavContainer")
+        self.horizontalLayout_2 = QHBoxLayout(self.topNavContainer)
         self.horizontalLayout_2.setSpacing(5)
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
         self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
-        self.rootBox = QComboBox(self.widget)
+        self.rootBox = QComboBox(self.topNavContainer)
+        self.rootBox.addItem("")
         self.rootBox.setObjectName(u"rootBox")
 
         self.horizontalLayout_2.addWidget(self.rootBox)
 
-        self.collectionsBox = QComboBox(self.widget)
+        self.collectionsBox = QComboBox(self.topNavContainer)
         self.collectionsBox.addItem("")
         self.collectionsBox.setObjectName(u"collectionsBox")
 
         self.horizontalLayout_2.addWidget(self.collectionsBox)
 
 
-        self.verticalLayout.addWidget(self.widget)
+        self.verticalLayout.addWidget(self.topNavContainer)
 
         self.libraryTopBarContainer = QWidget(self.libraryTab)
         self.libraryTopBarContainer.setObjectName(u"libraryTopBarContainer")
@@ -100,7 +101,20 @@ class Ui_AssetGallery(object):
 
         self.verticalLayout.addWidget(self.libraryTopBarContainer)
 
-        self.assetList = QListWidget(self.libraryTab)
+        self.assetListSplitter = QSplitter(self.libraryTab)
+        self.assetListSplitter.setObjectName(u"assetListSplitter")
+        sizePolicy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.assetListSplitter.sizePolicy().hasHeightForWidth())
+        self.assetListSplitter.setSizePolicy(sizePolicy)
+        self.assetListSplitter.setOrientation(Qt.Horizontal)
+        self.treeNav = QTreeWidget(self.assetListSplitter)
+        self.treeNav.setObjectName(u"treeNav")
+        self.treeNav.setHeaderHidden(True)
+        self.assetListSplitter.addWidget(self.treeNav)
+        self.treeNav.header().setVisible(False)
+        self.assetList = QListWidget(self.assetListSplitter)
         self.assetList.setObjectName(u"assetList")
         self.assetList.setAcceptDrops(True)
         self.assetList.setDragEnabled(True)
@@ -111,8 +125,9 @@ class Ui_AssetGallery(object):
         self.assetList.setGridSize(QSize(100, 100))
         self.assetList.setViewMode(QListView.IconMode)
         self.assetList.setUniformItemSizes(False)
+        self.assetListSplitter.addWidget(self.assetList)
 
-        self.verticalLayout.addWidget(self.assetList)
+        self.verticalLayout.addWidget(self.assetListSplitter)
 
         self.messageBrowser = QTextBrowser(self.libraryTab)
         self.messageBrowser.setObjectName(u"messageBrowser")
@@ -163,6 +178,7 @@ class Ui_AssetGallery(object):
         self.foldersTable.itemChanged.connect(AssetGallery.saveState)
         self.tabWidget.currentChanged.connect(AssetGallery.tabChanged)
         self.toggleFavorites.toggled.connect(AssetGallery.toggleFavoritesOnly)
+        self.treeNav.currentItemChanged.connect(AssetGallery.treeNavItemChanged)
 
         self.tabWidget.setCurrentIndex(0)
 
@@ -172,6 +188,8 @@ class Ui_AssetGallery(object):
 
     def retranslateUi(self, AssetGallery):
         AssetGallery.setWindowTitle(QCoreApplication.translate("AssetGallery", u"Form", None))
+        self.rootBox.setItemText(0, QCoreApplication.translate("AssetGallery", u"Root \u2193", None))
+
         self.collectionsBox.setItemText(0, QCoreApplication.translate("AssetGallery", u"Collection \u2193 ", None))
 
         self.collectionsBox.setCurrentText(QCoreApplication.translate("AssetGallery", u"Collection \u2193 ", None))
@@ -200,6 +218,8 @@ class Ui_AssetGallery(object):
         self.toggleListView.setToolTip(QCoreApplication.translate("AssetGallery", u"Toggles between the List and Grid view modes", None))
 #endif // QT_CONFIG(tooltip)
         self.toggleListView.setText("")
+        ___qtreewidgetitem = self.treeNav.headerItem()
+        ___qtreewidgetitem.setText(0, QCoreApplication.translate("AssetGallery", u"category", None));
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.libraryTab), QCoreApplication.translate("AssetGallery", u"Library", None))
         ___qtablewidgetitem = self.foldersTable.horizontalHeaderItem(0)
         ___qtablewidgetitem.setText(QCoreApplication.translate("AssetGallery", u"root", None));

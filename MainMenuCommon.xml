@@ -13,7 +13,7 @@
       <!-- Item: Asset Gallery -->
 
       <scriptItem id="oli.open_gallery">
-        <label>Open Asset Gallery</label>
+        <label>Open Gallery</label>
         <scriptCode><![CDATA[
 from oli import gallery
 from imp import reload

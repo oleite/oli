@@ -263,3 +263,16 @@ def envAddValue(name, value):
     finalString = ";".join(valueList)
     hou.putenv(name, finalString)
     return finalString
+
+
+def treeItemToFullPath(item, column=0):
+    """
+    (Qt) Gets the full path of an item in QTreeWidget
+
+    :param item: QTreeWidgetItem
+    """
+    path = item.text(column)
+    while item.parent():
+        path = item.parent().text(column) + "/" + path
+        item = item.parent()
+    return path

@@ -55,7 +55,7 @@
         <number>0</number>
        </property>
        <item>
-        <widget class="QWidget" name="widget" native="true">
+        <widget class="QWidget" name="topNavContainer" native="true">
          <layout class="QHBoxLayout" name="horizontalLayout_2">
           <property name="spacing">
            <number>5</number>
@@ -73,7 +73,13 @@
            <number>0</number>
           </property>
           <item>
-           <widget class="QComboBox" name="rootBox"/>
+           <widget class="QComboBox" name="rootBox">
+            <item>
+             <property name="text">
+              <string>Root ↓</string>
+             </property>
+            </item>
+           </widget>
           </item>
           <item>
            <widget class="QComboBox" name="collectionsBox">
@@ -223,37 +229,61 @@
         </widget>
        </item>
        <item>
-        <widget class="QListWidget" name="assetList">
-         <property name="acceptDrops">
-          <bool>true</bool>
+        <widget class="QSplitter" name="assetListSplitter">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
          </property>
-         <property name="dragEnabled">
-          <bool>true</bool>
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
          </property>
-         <property name="selectionMode">
-          <enum>QAbstractItemView::ExtendedSelection</enum>
-         </property>
-         <property name="movement">
-          <enum>QListView::Static</enum>
-         </property>
-         <property name="resizeMode">
-          <enum>QListView::Adjust</enum>
-         </property>
-         <property name="spacing">
-          <number>0</number>
-         </property>
-         <property name="gridSize">
-          <size>
-           <width>100</width>
-           <height>100</height>
-          </size>
-         </property>
-         <property name="viewMode">
-          <enum>QListView::IconMode</enum>
-         </property>
-         <property name="uniformItemSizes">
-          <bool>false</bool>
-         </property>
+         <widget class="QTreeWidget" name="treeNav">
+          <property name="headerHidden">
+           <bool>true</bool>
+          </property>
+          <attribute name="headerVisible">
+           <bool>false</bool>
+          </attribute>
+          <column>
+           <property name="text">
+            <string>category</string>
+           </property>
+          </column>
+         </widget>
+         <widget class="QListWidget" name="assetList">
+          <property name="acceptDrops">
+           <bool>true</bool>
+          </property>
+          <property name="dragEnabled">
+           <bool>true</bool>
+          </property>
+          <property name="selectionMode">
+           <enum>QAbstractItemView::ExtendedSelection</enum>
+          </property>
+          <property name="movement">
+           <enum>QListView::Static</enum>
+          </property>
+          <property name="resizeMode">
+           <enum>QListView::Adjust</enum>
+          </property>
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <property name="gridSize">
+           <size>
+            <width>100</width>
+            <height>100</height>
+           </size>
+          </property>
+          <property name="viewMode">
+           <enum>QListView::IconMode</enum>
+          </property>
+          <property name="uniformItemSizes">
+           <bool>false</bool>
+          </property>
+         </widget>
         </widget>
        </item>
        <item>
@@ -372,8 +402,8 @@
    <slot>thumbnailResize()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>582</x>
-     <y>70</y>
+     <x>586</x>
+     <y>60</y>
     </hint>
     <hint type="destinationlabel">
      <x>240</x>
@@ -404,8 +434,8 @@
    <slot>toggleListView()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>610</x>
-     <y>76</y>
+     <x>613</x>
+     <y>66</y>
     </hint>
     <hint type="destinationlabel">
      <x>501</x>
@@ -436,12 +466,12 @@
    <slot>saveState()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>325</x>
-     <y>64</y>
+     <x>586</x>
+     <y>60</y>
     </hint>
     <hint type="destinationlabel">
      <x>312</x>
-     <y>-121</y>
+     <y>0</y>
     </hint>
    </hints>
   </connection>
@@ -457,7 +487,7 @@
     </hint>
     <hint type="destinationlabel">
      <x>203</x>
-     <y>-149</y>
+     <y>0</y>
     </hint>
    </hints>
   </connection>
@@ -473,7 +503,7 @@
     </hint>
     <hint type="destinationlabel">
      <x>388</x>
-     <y>-169</y>
+     <y>0</y>
     </hint>
    </hints>
   </connection>
@@ -489,7 +519,7 @@
     </hint>
     <hint type="destinationlabel">
      <x>79</x>
-     <y>-158</y>
+     <y>0</y>
     </hint>
    </hints>
   </connection>
@@ -500,12 +530,28 @@
    <slot>toggleFavoritesOnly()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>292</x>
-     <y>68</y>
+     <x>265</x>
+     <y>66</y>
     </hint>
     <hint type="destinationlabel">
-     <x>779</x>
+     <x>617</x>
      <y>41</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>treeNav</sender>
+   <signal>currentItemChanged(QTreeWidgetItem*,QTreeWidgetItem*)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>treeNavItemChanged()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>99</x>
+     <y>223</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>71</x>
+     <y>-256</y>
     </hint>
    </hints>
   </connection>
@@ -525,5 +571,6 @@
   <slot>rootChanged()</slot>
   <slot>tabChanged()</slot>
   <slot>toggleFavoritesOnly()</slot>
+  <slot>treeNavItemChanged()</slot>
  </slots>
 </ui>

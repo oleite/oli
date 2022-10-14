@@ -45,11 +45,14 @@
 -->
 
 <menuDocument>
-    <!-- menuDocument can only contain 1 menu element, whose id is
-         implicitly "root_menu"
-      -->
+<!-- menuDocument can only contain 1 menu element, whose id is
+implicitly "root_menu"
+-->
     <menu>
         <actionItem id="pythonpanel::oli::gallery">
+            <context>
+                <expression>hou.getenv("OLI_HIDE_MENU_MAIN", "0").lower() not in ["true", "1", "t"]</expression>
+            </context>
             <insertAtIndex>0</insertAtIndex>
             <label>oli Gallery</label>
         </actionItem>

@@ -7,7 +7,7 @@ from PySide2 import QtWidgets, QtCore
 import pyperclip
 
 from oli import utils
-
+from oli import gallery
 
 class DefaultModel(object):
     def __init__(self, asset_gallery):
@@ -138,6 +138,11 @@ class DefaultModel(object):
         if self.Gallery.ui.toggleFavorites.isChecked() and "favorite" not in self.Gallery.getTags(item):
             item.setHidden(True)
 
+        if self.Gallery.ui.treeNav.currentItem() and "category" in itemData:
+            selectedPath = utils.treeItemToFullPath(self.Gallery.ui.treeNav.currentItem())
+
+            if not itemData["category"].startswith(selectedPath):
+                item.setHidden(True)
 
     def createItems(self):
         """
@@ -160,6 +165,8 @@ class DefaultModel(object):
             items.append(item)
             self.Gallery.threadPool.start(self.Gallery.LoadItemThumbnail(item))
 
+            item.setData(gallery.ITEM_BADGES_LIST_ROLE, self.itemBadges(item))
+
         self.Gallery.filterItems()
         return items
 
@@ -177,6 +184,10 @@ class DefaultModel(object):
         self.Gallery.ui.assetList.addItem(item)
 
         return item
+
+    def itemBadges(self, item):
+        badgeList = []
+        return badgeList
 
     def importAsset(self, item):
         asset_name = item.data(0)
@@ -259,6 +270,8 @@ class DefaultModel(object):
     def collectionChanged(self):
         collection = self.Gallery.ui.collectionsBox.currentText()
 
+        self.Gallery.ui.treeNav.clear()
+
         # Update self.current_root_model
         for i in range(self.Gallery.ui.foldersTable.rowCount()):
             root_item = self.Gallery.ui.foldersTable.item(i, 0)
@@ -277,3 +290,29 @@ class DefaultModel(object):
 
     def refresh(self):
         self.Gallery.loadState()
+
+    def treeNavItemChanged(self, item, oldItem):
+        self.Gallery.filterItems()
+
+    def createNavHierarchy(self, category):
+        tree = self.Gallery.ui.treeNav
+        splitCategory = category.strip("/").split("/")
+
+        topCat = splitCategory[0]
+        childrenValues = [tree.topLevelItem(idx).text(0) for idx in range(tree.topLevelItemCount())]
+        if topCat in childrenValues:
+            item = tree.topLevelItem(childrenValues.index(topCat))
+        else:
+            item = QtWidgets.QTreeWidgetItem(tree, [topCat, ])
+
+        item.setExpanded(True)
+
+        for subCat in splitCategory[1:]:
+            childrenValues = [item.child(idx).text(0) for idx in range(item.childCount())]
+
+            if subCat in childrenValues:
+                if item:
+                    child = item.child(childrenValues.index(subCat))
+            else:
+                child = QtWidgets.QTreeWidgetItem(item, [subCat, ])
+            item = child
