@@ -296,8 +296,6 @@ class Gallery(QtWidgets.QWidget):
         self.preferencesFile = kwargs.get("preferencesFile", hou.getenv("HOUDINI_USER_PREF_DIR") + "/oli_gallery_prefs.json")
         self.defaultPreferencesFile = kwargs.get("defaultPreferencesFile", str(hou.getenv("OLI_ROOT")) + "/oli_gallery_prefs.json")
 
-        print(self.defaultPreferencesFile)
-
         # Ensure valid Preferences File
         if os.path.isfile(self.preferencesFile):
             with open(self.preferencesFile, "r") as f:
