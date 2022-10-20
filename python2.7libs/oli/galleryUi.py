@@ -111,9 +111,9 @@ class Ui_AssetGallery(object):
         self.assetListSplitter.setOrientation(Qt.Horizontal)
         self.treeNav = QTreeWidget(self.assetListSplitter)
         self.treeNav.setObjectName(u"treeNav")
-        self.treeNav.setHeaderHidden(True)
+        self.treeNav.setAnimated(True)
         self.assetListSplitter.addWidget(self.treeNav)
-        self.treeNav.header().setVisible(False)
+        self.treeNav.header().setDefaultSectionSize(20)
         self.assetList = QListWidget(self.assetListSplitter)
         self.assetList.setObjectName(u"assetList")
         self.assetList.setAcceptDrops(True)
@@ -219,7 +219,7 @@ class Ui_AssetGallery(object):
 #endif // QT_CONFIG(tooltip)
         self.toggleListView.setText("")
         ___qtreewidgetitem = self.treeNav.headerItem()
-        ___qtreewidgetitem.setText(0, QCoreApplication.translate("AssetGallery", u"category", None));
+        ___qtreewidgetitem.setText(0, QCoreApplication.translate("AssetGallery", u"Category", None));
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.libraryTab), QCoreApplication.translate("AssetGallery", u"Library", None))
         ___qtablewidgetitem = self.foldersTable.horizontalHeaderItem(0)
         ___qtablewidgetitem.setText(QCoreApplication.translate("AssetGallery", u"root", None));
