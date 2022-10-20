@@ -194,17 +194,7 @@ class MegascansModel(DefaultModel.DefaultModel):
         msType = msData["semanticTags"]["asset_type"]  # 3D asset, 3D plant, surface, etc.
         msName = msData["semanticTags"]["name"]
 
-        # ================================================================================
-        # Get Object Network
-
-        network_editor = toolutils.networkEditor()
-        pwd = network_editor.pwd()
-        if pwd.childTypeCategory().name() == "Object":
-            obj = pwd
-        elif pwd.creator().childTypeCategory().name() == "Object":
-            obj = pwd.creator()
-        else:
-            obj = hou.node("/obj")
+        obj = self.getObjNet()
 
         # ================================================================================
         # Survey for files

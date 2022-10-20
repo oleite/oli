@@ -240,15 +240,15 @@
           <enum>Qt::Horizontal</enum>
          </property>
          <widget class="QTreeWidget" name="treeNav">
-          <property name="headerHidden">
+          <property name="animated">
            <bool>true</bool>
           </property>
-          <attribute name="headerVisible">
-           <bool>false</bool>
+          <attribute name="headerDefaultSectionSize">
+           <number>20</number>
           </attribute>
           <column>
            <property name="text">
-            <string>category</string>
+            <string>Category</string>
            </property>
           </column>
          </widget>

@@ -316,3 +316,15 @@ class DefaultModel(object):
             else:
                 child = QtWidgets.QTreeWidgetItem(item, [subCat, ])
             item = child
+
+    @staticmethod
+    def getObjNet():
+        network_editor = toolutils.networkEditor()
+        pwd = network_editor.pwd()
+        if pwd.childTypeCategory().name() == "Object":
+            obj = pwd
+        elif pwd.creator().childTypeCategory().name() == "Object":
+            obj = pwd.creator()
+        else:
+            obj = hou.node("/obj")
+        return obj

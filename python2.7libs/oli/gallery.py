@@ -101,6 +101,9 @@ class MyDelegate(QtWidgets.QStyledItemDelegate):
                 return True
         return False
 
+    def startDrag(self):
+        return
+
     def paint(self, painter, option, index):
         data = index.data(QtCore.Qt.UserRole)
         tags = data.get("tags", [])
@@ -223,7 +226,6 @@ class LoadItemThumbnail(QtCore.QRunnable):
     def __init__(self, item):
         self.item = item
         super(LoadItemThumbnail, self).__init__()
-        self.fallbackIcon = QtGui.QIcon(iconsPath + "/default_thumbnail.png")
 
     def run(self):
         time.sleep(0.01)  # For some reason QPixmap hangs houdini if this line isn't present (?????)
@@ -454,6 +456,10 @@ class Gallery(QtWidgets.QWidget):
                     # value = value.encode('utf-8')
                 elif type(value) is list:
                     value = ", ".join(value)
+
+                elif type(value) is dict:
+                    value = json.dumps(value, indent=4).replace("}", "").replace("{", "")
+
                 style = "font-weight:bold;"
             else:
                 style += "color:red"
@@ -687,13 +693,17 @@ class Gallery(QtWidgets.QWidget):
             self.ui.collectionsBox.blockSignals(False)
 
         self.ui.collectionsBox.setDisabled(False)
+        self.ui.collectionsBox.setHidden(False)
 
         Model = self.getModel()
         collections_list = Model.collectionsList()
         if not collections_list:
             collections_list = [""]
             self.ui.collectionsBox.setDisabled(True)
-            self.setMessage("No collection found")
+            self.ui.collectionsBox.setHidden(True)
+
+            # self.setMessage("No collection found")
+
         self.ui.collectionsBox.addItems(sorted(collections_list))
 
     def collectionChanged(self, save_state=True):
@@ -1425,3 +1435,13 @@ class Gallery(QtWidgets.QWidget):
 
     def treeNavItemChanged(self, item, oldItem):
         self.getModel().treeNavItemChanged(item, oldItem)
+
+        # parent = item.parent()
+        # if parent:
+        #     for i in range(parent.childCount()):
+        #         child = parent.child(i)
+        #         child.setExpanded(False)
+        #
+        # item.setExpanded(True)
+        #
+        # item.setSelected(True)
