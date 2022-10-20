@@ -7,13 +7,16 @@ import hou
 from imp import reload
 
 import pyperclip
-from PySide2 import QtWidgets, QtCore
+import toolutils
+from PySide2 import QtWidgets, QtCore, QtGui
 from oli.GalleryModels import DefaultModel
 from oli import lookdev
 from oli import utils
+from oli import gallery
 
 reload(DefaultModel)
 
+from timeit import default_timer as timer
 
 class MegascansModel(DefaultModel.DefaultModel):
     def __init__(self, ag):
@@ -71,16 +74,6 @@ class MegascansModel(DefaultModel.DefaultModel):
         # Separator
         menu.addSeparator()
 
-        # Menu Item: import_all_scatter
-        action_import_all_scatter = QtWidgets.QAction("Import and Scatter", self.Gallery)
-        action_import_all_scatter.setProperty("action", "import_all_scatter")
-        menu.addAction(action_import_all_scatter)
-
-        # Menu Item: add_to_layout_asset_gallery
-        action_add_to_layout_asset_gallery = QtWidgets.QAction("Add to Layout Asset Gallery", self.Gallery)
-        action_add_to_layout_asset_gallery.setProperty("action", "add_to_layout_asset_gallery")
-        menu.addAction(action_add_to_layout_asset_gallery)
-
         # Only show if single item selected
         if len(itemList) == 1:
             itemData = itemList[0].data(QtCore.Qt.UserRole)
@@ -111,56 +104,14 @@ class MegascansModel(DefaultModel.DefaultModel):
         # Run callbacks based on QActions "action" properties
         #
 
-        if action == "import_all":
-            for item in itemList:
-                node = self.importAsset(item)
-
-        elif action == "import_all_scatter":
-            assetReferenceNodes = []
-
-            # Deselect all
-            for n in hou.selectedNodes():
-                n.setSelected(False)
-
-            for item in itemList:
-                node = self.importAsset(item)
-                if node.type().name() == "assetreference":
-                    assetReferenceNodes.append(node)
-
-            # Create demo Variant Instancer from imported assets
-            if len(assetReferenceNodes) > 1 or action == "import_all_scatter":
-                merge_node = assetReferenceNodes[0].parent().createNode("merge")
-                y = 0
-                total_x = 0
-                for node in assetReferenceNodes:
-                    merge_node.setNextInput(node)
-                    y = min(y, node.position().y())
-                    total_x += node.position().x()
-                x = total_x / len(assetReferenceNodes)
-                merge_node.setPosition((x, y - 1))
-                reload(lookdev)
-                lookdev.demo_variant_instancer(merge_node)
-
-        elif action == "add_to_layout_asset_gallery":
-            for item in itemList:
-                itemData = item.data(QtCore.Qt.UserRole)
-                directory = self.Gallery.collectionPath + "/" + itemData["asset_name"]
-                reload(lookdev)
-                uuid_list = lookdev.add_to_layout_asset_gallery(directory)
-                for uuid in uuid_list:
-                    lookdev.add_to_aws(uuid)
-
         for item in itemList:
             itemData = item.data(QtCore.Qt.UserRole)
 
-            # if action == "import_all":
-            #     self.Gallery.import_asset(item)
-
-            if action == "import_mats_styles":
-                self.importAsset(item, import_geo=False)
+            if action == "import_all":
+                node = self.importAsset(item)
 
             elif "COPY_" in action:
-                action = action.lstrip("COPY_")
+                action = action.replace("COPY_", "")
                 pyperclip.copy(itemData[action])  # Copy to clipboard
 
             elif action == "action_open_in_explorer":
@@ -184,20 +135,32 @@ class MegascansModel(DefaultModel.DefaultModel):
         with open(hou.text.expandString(ms_json_path), "r") as f:
             ms_dict = json.load(f)
 
-        display_name = ms_dict["semanticTags"]["name"] + " " + ms_dict["id"]
+        display_name = ms_dict["semanticTags"]["name"]
+
+        d = ms_dict["assetCategories"]
+        categoryList = []
+        while len(d) > 0:
+            if not type(d) == dict:
+                break
+            cat = sorted(d)[0]
+            l = [w.strip().capitalize().replace("3d", "3D") for w in cat.split()]
+            categoryList.append(utils.makeSafe("".join(l)))
+            d = d[cat]
+        category = "/".join(categoryList)
+
+        self.createNavHierarchy(category)
 
         itemData.update({
             "ms_json_path": ms_json_path,
-            "asset_name": display_name,
-            "thumbnail_path": self.Gallery.format_pattern(asset_name, "__ROOT__/__COLLECTION__/__ASSET__/*_Preview.png"),
+            "asset_display_name": display_name,
+            "thumbnail_path": self.Gallery.format_pattern(asset_name,
+                                                          "__ROOT__/__COLLECTION__/__ASSET__/*_Preview.png"),
             "ms_id": ms_dict["id"],
             "tags": self.Gallery.getTagsFromId(self.Gallery.ui.collectionsBox.currentText() + "/" + display_name),
+            "category": category
         })
 
-        geometry_pattern = "__ROOT__/__COLLECTION__/__ASSET__/*.abc"
-        geometry_path = self.Gallery.format_pattern(asset_name, geometry_pattern)
-
-        item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_name"])
+        item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_display_name"])
         item.setData(QtCore.Qt.UserRole, itemData)
 
         self.Gallery.updateItemTooltip(item)
@@ -207,104 +170,193 @@ class MegascansModel(DefaultModel.DefaultModel):
 
     def importAsset(self, item):
         if not self.valid:
-            return False
-
+            return
         itemData = item.data(QtCore.Qt.UserRole)
+        assetDir = utils.join(self.Gallery.collectionPath, itemData["asset_name"])
 
-        asset_directory = self.Gallery.collectionPath + "/" + itemData["asset_name"]
+        # ================================================================================
+        # Get Megascans asset .json file
+        msJson = None
+        for name in os.listdir(assetDir):
+            if name.endswith(".json"):
+                msJson = utils.join(assetDir, name)
+                break
+        if not msJson:
+            hou.ui.displayMessage("No json file found", title="Build Megascans", help=assetDir,
+                                  severity=hou.severityType.Error)
+            return
 
-        # selection = hou.selectedNodes()
-        # if selection:
-        #     if selection[-1].type().name() == "ol::instancer":
-        #         reload(lookdev)
-        #         return lookdev.add_to_ol_instancer(selection[-1], directory)
+        # Get asset data from json file
 
-        # TODO
-        save_directory = "U:/Gabriel_Leite/usd"
-        force_rebuild = False
+        with open(msJson, "r") as f:
+            msData = json.load(f)
+        msId = msData["id"]
+        msType = msData["semanticTags"]["asset_type"]  # 3D asset, 3D plant, surface, etc.
+        msName = msData["semanticTags"]["name"]
 
-        selection = hou.selectedNodes()
-        asset_id = asset_directory.split("_")[-1]
+        # ================================================================================
+        # Get Object Network
 
-        with open(hou.text.expandString(itemData["ms_json_path"])) as f:
-            data = json.load(f)
+        network_editor = toolutils.networkEditor()
+        pwd = network_editor.pwd()
+        if pwd.childTypeCategory().name() == "Object":
+            obj = pwd
+        elif pwd.creator().childTypeCategory().name() == "Object":
+            obj = pwd.creator()
+        else:
+            obj = hou.node("/obj")
 
-        asset_type = os.path.split(os.path.dirname(asset_directory))[-1]
-        asset_name = utils.makeSafe(data["name"])
-        asset_name_full = asset_name + "_" + asset_id
+        # ================================================================================
+        # Survey for files
 
-        asset_save_directory = hou.text.expandString(save_directory + "/" + asset_name_full)
-        if not os.path.exists(asset_save_directory):
-            os.makedirs(asset_save_directory)
+        textures = {
+            "displacement": None,
+            "roughness": None,
+            "albedo": None,
+            # "ao": None,
+            "normal": None,
+            "translucency": None,
+            "opacity": None,
+        }
+        alembicList = []
 
-        # Copy preview
-        import shutil
-        preview_src = asset_directory + "/" + asset_id + "_Preview.png"
-        preview_dst = asset_save_directory + "/" + asset_name_full + "_thumbnail.png"
-        shutil.copyfile(preview_src, preview_dst)
+        def survey(_path):
+            if not os.path.isfile(_path):
+                return
+            name = os.path.split(_path)[-1]
+            if name.endswith(".abc"):
+                alembicList.append(_path)
+            for texName in textures:
+                if texName.lower() in [s.lower() for s in name.replace(".", "_").split("_")]:
+                    textures[texName] = _path
 
-        parent = hou.node("/stage")
+        for name in os.listdir(assetDir):
+            path = utils.join(assetDir, name)
+            if os.path.isdir(path):
+                if name.startswith("Var") or name == "Textures":
+                    for name2 in os.listdir(path):
+                        path2 = utils.join(path, name2)
+                        if name2 == "Atlas":
+                            for name3 in os.listdir(path2):
+                                path3 = utils.join(path2, name3)
+                                survey(path3)
+                        else:
+                            survey(path2)
+            else:
+                survey(path)
 
-        #
-        # Asset Reference
-        #
-        usd_filepath = asset_save_directory + "/" + asset_name_full + ".usd"
+        if not alembicList:
+            hou.ui.displayMessage("No alembic found", title="Build Megascans", help=assetDir,
+                                  severity=hou.severityType.Error)
+            return
 
-        assetreference = parent.createNode("assetreference", asset_name)
-        #assetreference.moveToGoodPosition()
-        assetreference.setParms({
-            "filepath": usd_filepath,
-        })
-        assetreference.setGenericFlag(hou.nodeFlag.Display, True)
+        # ================================================================================
+        # Build Geometry
 
-        assetreference.setSelected(True, True)
+        nodeName = utils.makeSafe("_".join([msName, msId]))
+        objNode = obj.createNode("geo", nodeName)
+        matnet = objNode.createNode("matnet", "materials")
 
-        if selection:
-            assetreference.setInput(0, selection[-1])
+        def cmToM(node):
+            xformSop = node.createOutputNode("xform", "cm_to_m")
+            xformSop.parm("scale").set(0.01)
 
-        if not force_rebuild and os.path.exists(usd_filepath):
-            return assetreference
+            switchIf = node.createOutputNode("switchif", "if_convert_to_meters")
+            switchIf.setInput(1, xformSop)
+            switchIf.parm("expr1").setExpression("ch('../convert_to_meters')")
+            return switchIf
 
-        #
-        # TOPNET
-        #
+        mergeSop = objNode.createNode("merge", "variation_merge")
+        outNullMergedSop = cmToM(mergeSop).createOutputNode("null", "OUT_MERGED")
 
-        topnet = parent.createNode("topnet", asset_name + "__BUILDING_ASSET")
-        topnet.setPosition(assetreference.position())
-        topnet.move((0, 1))
+        switchSop = objNode.createNode("switch", "variation_switch")
+        for abcPath in alembicList:
+            name = utils.makeSafe(os.path.split(abcPath)[-1].replace(".abc", ""))
 
-        hserver_begin = topnet.createNode("houdiniserver")
+            abcSop = objNode.createNode("alembic", name)
+            abcSop.parm("fileName").set(abcPath)
 
-        sendcommand = hserver_begin.createOutputNode("sendcommand")
+            nameSop = abcSop.createOutputNode("name", "name")
+            nameSop.parm("name1").set(name)
 
-        sendcommand.parm("commandstring").set('''
-import hou
-from oli import build_asset
+            mergeSop.setNextInput(nameSop)
+            switchSop.setNextInput(nameSop)
 
-hou.hipFile.save("''' + asset_save_directory + '''/''' + asset_name_full + '''.hip", False)
+        matSop = cmToM(switchSop).createOutputNode("material", "assign_material")
+        matSop.parm("shop_materialpath1").set("../materials/{}".format(nodeName))
 
-componentoutput = build_asset.build_megascans_component("'''+asset_directory+'''")
-componentoutput.parm("lopoutput").set("\$HIP/\`chs('filename')\`")
-componentoutput.parm("execute").pressButton()
+        outNullSop = matSop.createOutputNode("null", "OUT_SINGLE")
+        outNullSop.setGenericFlag(hou.nodeFlag.Display, True)
+        outNullSop.setGenericFlag(hou.nodeFlag.Render, True)
 
-hou.hipFile.save()
-        ''')
+        # ================================================================================
+        # Create "Variation" switch parm on top level objNode
 
-        hserver_end = sendcommand.createOutputNode("commandserverend")
-        hserver_end.parm("pdg_feedbackbegin").set("../" + hserver_begin.name())
-        hserver_end.setColor(hserver_begin.color())
-        hserver_end.setGenericFlag(hou.nodeFlag.Display, True)
+        geoCount = len(switchSop.inputs())
 
-        topnet.layoutChildren()
+        folderTemplateList = [
+            hou.ToggleParmTemplate("convert_to_meters", "Convert to Meters", True)
+        ]
+        if geoCount > 1:
+            folderTemplateList.append(
+                hou.IntParmTemplate("variation", "Variation", 1, (0,), min=0, max=geoCount - 1),
+            )
+            switchSop.parm("input").setExpression("ch('../variation')")
+        else:
+            switchSop.destroy()
 
-        # Cook
-        topnet.parm("cookbutton").pressButton()
+        folderTemplate = hou.FolderParmTemplate("tab_properties", "Properties", folderTemplateList,
+                                                hou.folderType.Simple)
 
-        return assetreference
+        templateGroup = objNode.parmTemplateGroup()
+        templateGroup.insertBefore((0,), hou.SeparatorParmTemplate("sep"))
+        templateGroup.insertBefore((0,), folderTemplate)
+        objNode.setParmTemplateGroup(templateGroup)
 
-    def collectionChanged(self):
-        super(MegascansModel, self).collectionChanged()
+        # ================================================================================
+        # Build Materials
 
-        if hou.applicationVersion()[0] < 19:
-            self.valid = False
-            self.Gallery.setMessage('<span class="error">MegascansModel só é suportado a partir do Houdini 19</span>')
+        vraySubnet = matnet.createNode("vray_vop_material", nodeName)
+        vrayMtl = vraySubnet.node("vrayMtl")
+        vrayOutput = vraySubnet.node("vrayOutput")
+
+        def imageFileNode(imgPath, name, colorSpace="lin_srgb"):
+            fileNode = vraySubnet.createNode("VRayNodeMetaImageFile", name)
+            fileNode.parm("BitmapBuffer_file").set(imgPath)
+            fileNode.parm("BitmapBuffer_rgb_color_space").set(colorSpace)
+            if colorSpace == "raw":
+                fileNode.parm("BitmapBuffer_color_space").set("0")
+            return fileNode
+
+        vrayMtl.parmTuple("reflect").set((1, 1, 1, 1))
+
+        if textures.get("albedo"):
+            fileNode = imageFileNode(textures["albedo"], "albedo_map", "lin_srgb")
+            vrayMtl.setNamedInput("diffuse", fileNode, 0)
+            vraySubnet.parm("ogl_tex1").set(textures["albedo"])
+
+        if textures.get("roughness"):
+            fileNode = imageFileNode(textures["roughness"], "roughness_map", "raw")
+            vrayMtl.setNamedInput("reflect_glossiness", fileNode, 0)
+            vrayMtl.parm("option_use_roughness").set("1")
+
+        if textures.get("normal"):
+            fileNode = imageFileNode(textures["normal"], "normal_map", "raw")
+            vrayMtl.setNamedInput("bump_map", fileNode, 0)
+            vrayMtl.parm("bump_type").set("1")  # Bump Type: Normal (Tangent)
+
+        if textures.get("displacement"):
+            fileNode = imageFileNode(textures["displacement"], "displacement_map", "raw")
+            displacement = fileNode.createOutputNode("VRayNodeGeomDisplacedMesh")
+            displacement.parm("displacement_amount").set(.01)
+            displacement.parm("displacement_shift").setExpression("ch('displacement_amount')/-2")
+            vrayOutput.setInput(1, displacement)
+
+        # ================================================================================
+        # Layout nodes and return top level objNode
+
+        objNode.layoutChildren()
+        matnet.layoutChildren()
+        vraySubnet.layoutChildren()
+
+        return objNode
