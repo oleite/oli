@@ -13,9 +13,9 @@ import toolutils
 from PySide2 import QtGui, QtWidgets, QtCore
 import json
 
-import galleryUi
-import lookdev
-import utils
+from . import galleryUi
+from . import lookdev
+from . import utils
 
 
 iconsPath = hou.getenv("OLI_ICONS")
@@ -62,7 +62,7 @@ def rectShrink(rect, x, y):
 
 
 def errHandler(msg_type, msg_log_context, msg_string):
-    if msg_string == "libpng warning: iCCP: profile 'VP2768 Series': 0h: PCS illuminant is not D50":
+    if "libpng" in msg_string:
         return
     print(msg_type, msg_log_context, msg_string)
 

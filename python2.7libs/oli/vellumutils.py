@@ -2,8 +2,7 @@ import itertools
 import os
 import hou
 
-from utils import makeSafe
-
+from .utils import makeSafe
 
 def storeNodePos(node):
     pos = node.position()

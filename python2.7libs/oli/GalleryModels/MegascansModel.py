@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 
 import hou
 from imp import reload
@@ -174,25 +175,9 @@ class MegascansModel(DefaultModel.DefaultModel):
         itemData = item.data(QtCore.Qt.UserRole)
         assetDir = utils.join(self.Gallery.collectionPath, itemData["asset_name"])
 
-        # ================================================================================
-        # Get Megascans asset .json file
-        msJson = None
-        for name in os.listdir(assetDir):
-            if name.endswith(".json"):
-                msJson = utils.join(assetDir, name)
-                break
-        if not msJson:
-            hou.ui.displayMessage("No json file found", title="Build Megascans", help=assetDir,
-                                  severity=hou.severityType.Error)
-            return
-
-        # Get asset data from json file
-
-        with open(msJson, "r") as f:
-            msData = json.load(f)
-        msId = msData["id"]
-        msType = msData["semanticTags"]["asset_type"]  # 3D asset, 3D plant, surface, etc.
-        msName = msData["semanticTags"]["name"]
+        msName = itemData["asset_display_name"]
+        msId = itemData["ms_id"]
+        msType = itemData["category"].split("/")[0]
 
         obj = self.getObjNet()
 
@@ -211,142 +196,218 @@ class MegascansModel(DefaultModel.DefaultModel):
         alembicList = []
 
         def survey(_path):
+            """
+            Checks if the _path is a useful file, and if so adds it to its according list.
+            """
+
             if not os.path.isfile(_path):
                 return
+
+            def getLOD(abcPath):
+                split = abcPath.split("_LOD")
+                root = split[0]
+                lod = int(split[-1].replace(".abc", ""))
+                return root, lod
+
             name = os.path.split(_path)[-1]
             if name.endswith(".abc"):
+
+                # Checks if there is an Alembic at the same folder with a lower LOD number
+                root, lod = getLOD(_path)
+                for p in alembicList:
+                    _root, _lod = getLOD(p)
+                    if root == _root and lod > _lod:
+                        return
+
                 alembicList.append(_path)
+
             for texName in textures:
                 if texName.lower() in [s.lower() for s in name.replace(".", "_").split("_")]:
                     textures[texName] = _path
 
         for name in os.listdir(assetDir):
             path = utils.join(assetDir, name)
-            if os.path.isdir(path):
-                if name.startswith("Var") or name == "Textures":
-                    for name2 in os.listdir(path):
-                        path2 = utils.join(path, name2)
-                        if name2 == "Atlas":
-                            for name3 in os.listdir(path2):
-                                path3 = utils.join(path2, name3)
-                                survey(path3)
-                        else:
-                            survey(path2)
-            else:
-                survey(path)
 
-        if not alembicList:
-            hou.ui.displayMessage("No alembic found", title="Build Megascans", help=assetDir,
-                                  severity=hou.severityType.Error)
-            return
+            if os.path.isfile(path):
+                survey(path)
+                continue
+
+            if name.startswith("Var") or name == "Textures":
+                for name2 in os.listdir(path):
+                    path2 = utils.join(path, name2)
+                    if name2 == "Atlas":
+                        for name3 in os.listdir(path2):
+                            path3 = utils.join(path2, name3)
+                            survey(path3)
+                    else:
+                        survey(path2)
 
         # ================================================================================
-        # Build Geometry
+        # Build
 
         nodeName = utils.makeSafe("_".join([msName, msId]))
-        objNode = obj.createNode("geo", nodeName)
-        matnet = objNode.createNode("matnet", "materials")
 
-        def cmToM(node):
-            xformSop = node.createOutputNode("xform", "cm_to_m")
-            xformSop.parm("scale").set(0.01)
+        if msType in ["3DAsset", "3DPlant", "Atlas"]:
+            if not alembicList and msType in ["3DAsset", "3DPlant"]:
+                hou.ui.displayMessage("No alembic found", title="Build Megascans", help=assetDir,
+                                      severity=hou.severityType.Error)
+                return
 
-            switchIf = node.createOutputNode("switchif", "if_convert_to_meters")
-            switchIf.setInput(1, xformSop)
-            switchIf.parm("expr1").setExpression("ch('../convert_to_meters')")
-            return switchIf
+            objNode = obj.createNode("geo", nodeName)
+            matnet = objNode.createNode("matnet", "materials")
+            vraySubnet = self.buildVRayMaterials(matnet, textures, nodeName)
 
-        mergeSop = objNode.createNode("merge", "variation_merge")
-        outNullMergedSop = cmToM(mergeSop).createOutputNode("null", "OUT_MERGED")
+            if msType == "Atlas" and "opacity" in textures:
+                opacityMap = textures["opacity"]
 
-        switchSop = objNode.createNode("switch", "variation_switch")
-        for abcPath in alembicList:
-            name = utils.makeSafe(os.path.split(abcPath)[-1].replace(".abc", ""))
+                try:
+                    atlasSplitter = objNode.createNode("ODFX_AtlasSplitter")  # TODO
+                    atlasSplitter.setParms({
+                        "file": opacityMap,
+                    })
+                except hou.OperationFailed:
+                    atlasSplitter = objNode.createNode("null", "ODFX_AtlasSplitter")
+                    hou.ui.displayMessage("ODFX AtlasSplitter HDA wasn't found.", help="Available at: https://origamidigital.com")
 
-            abcSop = objNode.createNode("alembic", name)
-            abcSop.parm("fileName").set(abcPath)
+                matSop = atlasSplitter.createOutputNode("material", "assign_material")
+                matSop.parm("shop_materialpath1").set("../materials/{}".format(nodeName))
 
-            nameSop = abcSop.createOutputNode("name", "name")
-            nameSop.parm("name1").set(name)
+                outNullSop = matSop.createOutputNode("null", "OUT_MERGED")
+                outNullSop.setGenericFlag(hou.nodeFlag.Display, True)
+                outNullSop.setGenericFlag(hou.nodeFlag.Render, True)
+                pass
+            else:
+                def cmToM(node):
+                    xformSop = node.createOutputNode("xform", "cm_to_m")
+                    xformSop.parm("scale").set(0.01)
 
-            mergeSop.setNextInput(nameSop)
-            switchSop.setNextInput(nameSop)
+                    switchIf = node.createOutputNode("switchif", "if_convert_to_meters")
+                    switchIf.setInput(1, xformSop)
+                    switchIf.parm("expr1").setExpression("ch('../convert_to_meters')")
+                    return switchIf
 
-        matSop = cmToM(switchSop).createOutputNode("material", "assign_material")
-        matSop.parm("shop_materialpath1").set("../materials/{}".format(nodeName))
+                mergeSop = objNode.createNode("merge", "variation_merge")
+                outNullMergedSop = cmToM(mergeSop).createOutputNode("null", "OUT_MERGED")
 
-        outNullSop = matSop.createOutputNode("null", "OUT_SINGLE")
-        outNullSop.setGenericFlag(hou.nodeFlag.Display, True)
-        outNullSop.setGenericFlag(hou.nodeFlag.Render, True)
+                switchSop = objNode.createNode("switch", "variation_switch")
+                for abcPath in alembicList:
+                    name = utils.makeSafe(os.path.split(abcPath)[-1].replace(".abc", ""))
 
-        # ================================================================================
-        # Create "Variation" switch parm on top level objNode
+                    abcSop = objNode.createNode("alembic", name)
+                    abcSop.parm("fileName").set(abcPath)
 
-        geoCount = len(switchSop.inputs())
+                    nameSop = abcSop.createOutputNode("name", "name")
+                    nameSop.parm("name1").set(name)
 
-        folderTemplateList = [
-            hou.ToggleParmTemplate("convert_to_meters", "Convert to Meters", True)
-        ]
-        if geoCount > 1:
-            folderTemplateList.append(
-                hou.IntParmTemplate("variation", "Variation", 1, (0,), min=0, max=geoCount - 1),
-            )
-            switchSop.parm("input").setExpression("ch('../variation')")
+                    mergeSop.setNextInput(nameSop)
+                    switchSop.setNextInput(nameSop)
+
+                matSop = cmToM(switchSop).createOutputNode("material", "assign_material")
+                matSop.parm("shop_materialpath1").set("../materials/{}".format(nodeName))
+
+                outNullSop = matSop.createOutputNode("null", "OUT_SINGLE")
+                outNullSop.setGenericFlag(hou.nodeFlag.Display, True)
+                outNullSop.setGenericFlag(hou.nodeFlag.Render, True)
+
+                # ================================================================================
+                # Create "Variation" switch parm on top level objNode
+
+                geoCount = len(switchSop.inputs())
+
+                folderTemplateList = [
+                    hou.ToggleParmTemplate("convert_to_meters", "Convert to Meters", True)
+                ]
+                if geoCount > 1:
+                    folderTemplateList.append(
+                        hou.IntParmTemplate("variation", "Variation", 1, (0,), min=0, max=geoCount - 1),
+                    )
+                    switchSop.parm("input").setExpression("ch('../variation')")
+                else:
+                    switchSop.destroy()
+
+                folderTemplate = hou.FolderParmTemplate("tab_properties", "Properties", folderTemplateList,
+                                                        hou.folderType.Simple)
+
+                templateGroup = objNode.parmTemplateGroup()
+                templateGroup.insertBefore((0,), hou.SeparatorParmTemplate("sep"))
+                templateGroup.insertBefore((0,), folderTemplate)
+                objNode.setParmTemplateGroup(templateGroup)
+
+            matnet.layoutChildren()
+            objNode.layoutChildren()
+            objNode.setSelected(True, True)
+            return objNode
+
         else:
-            switchSop.destroy()
+            network_editor = toolutils.networkEditor()
+            pwd = network_editor.pwd()
+            if pwd.childTypeCategory().name() == "Vop":
+                matnet = pwd
+            else:
+                matnet = hou.node("/mat")
 
-        folderTemplate = hou.FolderParmTemplate("tab_properties", "Properties", folderTemplateList,
-                                                hou.folderType.Simple)
+            vraySubnet = self.buildVRayMaterials(matnet, textures, nodeName)
 
-        templateGroup = objNode.parmTemplateGroup()
-        templateGroup.insertBefore((0,), hou.SeparatorParmTemplate("sep"))
-        templateGroup.insertBefore((0,), folderTemplate)
-        objNode.setParmTemplateGroup(templateGroup)
+            matnet.layoutChildren()
+            vraySubnet.setSelected(True, True)
+            return vraySubnet
 
-        # ================================================================================
-        # Build Materials
-
+    @staticmethod
+    def buildVRayMaterials(matnet, textures, nodeName):
         vraySubnet = matnet.createNode("vray_vop_material", nodeName)
         vrayMtl = vraySubnet.node("vrayMtl")
         vrayOutput = vraySubnet.node("vrayOutput")
 
         def imageFileNode(imgPath, name, colorSpace="lin_srgb"):
-            fileNode = vraySubnet.createNode("VRayNodeMetaImageFile", name)
-            fileNode.parm("BitmapBuffer_file").set(imgPath)
-            fileNode.parm("BitmapBuffer_rgb_color_space").set(colorSpace)
+            node = vraySubnet.createNode("VRayNodeMetaImageFile", name)
+            node.parm("BitmapBuffer_file").set(imgPath)
+            node.parm("BitmapBuffer_rgb_color_space").set(colorSpace)
             if colorSpace == "raw":
-                fileNode.parm("BitmapBuffer_color_space").set("0")
-            return fileNode
+                node.parm("BitmapBuffer_color_space").set("0")
+            return node
 
         vrayMtl.parmTuple("reflect").set((1, 1, 1, 1))
 
-        if textures.get("albedo"):
-            fileNode = imageFileNode(textures["albedo"], "albedo_map", "lin_srgb")
+        albedoMap = textures.get("albedo")
+        opacityMap = textures.get("opacity")
+        roughnessMap = textures.get("roughness")
+        normalMap = textures.get("normal")
+        displacementMap = textures.get("displacement")
+        translucencyMap = textures.get("translucency")
+
+        if albedoMap:
+            fileNode = imageFileNode(albedoMap, "albedo_map", "lin_srgb")
             vrayMtl.setNamedInput("diffuse", fileNode, 0)
-            vraySubnet.parm("ogl_tex1").set(textures["albedo"])
+            vraySubnet.parm("ogl_tex1").set(albedoMap)
 
-        if textures.get("roughness"):
-            fileNode = imageFileNode(textures["roughness"], "roughness_map", "raw")
-            vrayMtl.setNamedInput("reflect_glossiness", fileNode, 0)
-            vrayMtl.parm("option_use_roughness").set("1")
+        if opacityMap:
+            fileNode = imageFileNode(opacityMap, "opacity_map", "raw")
+            vrayMtl.setNamedInput("opacity", fileNode, 0)
+            vraySubnet.parm("ogl_opacitymap").set(opacityMap)
 
-        if textures.get("normal"):
-            fileNode = imageFileNode(textures["normal"], "normal_map", "raw")
+        if roughnessMap:
+            fileNode = imageFileNode(roughnessMap, "roughness_map", "raw")
+            invert = fileNode.createOutputNode("VRayNodeTexInvert", "invert_to_glossiness")
+            vrayMtl.setNamedInput("reflect_glossiness", invert, 0)
+            # vrayMtl.parm("option_use_roughness").set("1")   # Doesn't work with VRay RTX
+
+        if normalMap:
+            fileNode = imageFileNode(normalMap, "normal_map", "raw")
             vrayMtl.setNamedInput("bump_map", fileNode, 0)
             vrayMtl.parm("bump_type").set("1")  # Bump Type: Normal (Tangent)
 
-        if textures.get("displacement"):
-            fileNode = imageFileNode(textures["displacement"], "displacement_map", "raw")
+        if displacementMap:
+            fileNode = imageFileNode(displacementMap, "displacement_map", "raw")
             displacement = fileNode.createOutputNode("VRayNodeGeomDisplacedMesh")
             displacement.parm("displacement_amount").set(.01)
             displacement.parm("displacement_shift").setExpression("ch('displacement_amount')/-2")
             vrayOutput.setInput(1, displacement)
 
-        # ================================================================================
-        # Layout nodes and return top level objNode
+        if translucencyMap:
+            fileNode = imageFileNode(translucencyMap, "translucency_map", "lin_srgb")
+            twoSided = vrayMtl.createOutputNode("VRayNodeMtl2Sided", "twoSidedMtl")
+            twoSided.setNamedInput("translucency_tex", fileNode, 0)
+            vrayOutput.setInput(0, twoSided)
 
-        objNode.layoutChildren()
-        matnet.layoutChildren()
         vraySubnet.layoutChildren()
-
-        return objNode
+        return vraySubnet
