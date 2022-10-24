@@ -2,7 +2,6 @@ import os
 import sys
 import inspect
 import hou
-from oli import utils
 
 
 tool_root = inspect.getfile(inspect.currentframe()).replace('\\', '/')
@@ -14,6 +13,14 @@ galleryModelsDirectory = tool_root + "/python2.7libs/oli/GalleryModels"
 
 hou.putenv("OLI_ROOT", tool_root)
 hou.putenv("OLI_ICONS", iconsDirectory)
+
+
+# ------------------------------ #
+
+sys.path.append(tool_root + "/python2.7libs")
+
+from oli import utils
+
 utils.envAddValue("OLI_GALLERY_MODELS_PATH", galleryModelsDirectory)
 
 

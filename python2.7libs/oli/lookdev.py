@@ -9,7 +9,7 @@ import shutil
 import hou
 import json
 
-import utils
+from . import utils
 
 
 def copy_folder(src, dst, symlinks=False, ignore=None):
