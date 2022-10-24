@@ -369,6 +369,8 @@ class Gallery(QtWidgets.QWidget):
             Model = self.Model
             return Model
 
+        del self.Model
+
         def getClassFromFile(parentModuleDir, className):
             if not os.path.exists(parentModuleDir):
                 return
