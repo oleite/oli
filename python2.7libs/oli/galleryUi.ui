@@ -73,24 +73,13 @@
            <number>0</number>
           </property>
           <item>
-           <widget class="QComboBox" name="rootBox">
-            <item>
-             <property name="text">
-              <string>Root ↓</string>
-             </property>
-            </item>
-           </widget>
+           <widget class="QComboBox" name="rootBox"/>
           </item>
           <item>
            <widget class="QComboBox" name="collectionsBox">
             <property name="currentText">
-             <string>Collection ↓ </string>
+             <string/>
             </property>
-            <item>
-             <property name="text">
-              <string>Collection ↓ </string>
-             </property>
-            </item>
            </widget>
           </item>
          </layout>
@@ -208,6 +197,9 @@
           </item>
           <item>
            <widget class="QToolButton" name="toggleListView">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="toolTip">
              <string>Toggles between the List and Grid view modes</string>
             </property>
@@ -240,7 +232,19 @@
           <enum>Qt::Horizontal</enum>
          </property>
          <widget class="QTreeWidget" name="treeNav">
+          <property name="autoExpandDelay">
+           <number>0</number>
+          </property>
+          <property name="rootIsDecorated">
+           <bool>false</bool>
+          </property>
           <property name="animated">
+           <bool>true</bool>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+          <property name="headerHidden">
            <bool>true</bool>
           </property>
           <attribute name="headerDefaultSectionSize">

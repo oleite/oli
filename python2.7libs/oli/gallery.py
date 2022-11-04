@@ -298,16 +298,53 @@ class Gallery(QtWidgets.QWidget):
         self.preferencesFile = kwargs.get("preferencesFile", hou.getenv("HOUDINI_USER_PREF_DIR") + "/oli_gallery_prefs.json")
         self.defaultPreferencesFile = kwargs.get("defaultPreferencesFile", str(hou.getenv("OLI_ROOT")) + "/oli_gallery_prefs.json")
 
+        if not self.validatePreferences():
+            return
+
+        # If force default folders
+        if kwargs.get("forceDefaultFolders"):
+            self.loadStateFolders()
+            self.loadDefaultFolders(append=True)
+
+        self.loadMessage()
+
+    def validatePreferences(self):
+
+        # ========================================
+        # Ensure valid Default Preferences File
+
+        def invalidDefaultMsg():
+            hou.ui.displayMessage("Invalid Default Preferences file",
+                        help=self.defaultPreferencesFile,
+                        severity=hou.severityType.Error,
+                        title="ol Gallery"
+                        )
+            self.setMessage('<span class="error"><b>Invalid Default Preferences File</b> <br><br>{}</span>'.format(self.defaultPreferencesFile))
+            self.setDisabled(True)
+            return False
+
+        if not os.path.isfile(self.defaultPreferencesFile):
+            invalidDefaultMsg()
+            return False
+
+        with open(self.defaultPreferencesFile, "r") as f:
+            try:
+                data = json.load(f)
+            except ValueError:
+                invalidDefaultMsg()
+                return False
+
+        # ========================================
         # Ensure valid Preferences File
         if os.path.isfile(self.preferencesFile):
             with open(self.preferencesFile, "r") as f:
                 try:
                     data = json.load(f)
                 except ValueError:
-                    hou.ui.displayMessage("Invalid Preferences File",
+                    hou.ui.displayMessage("Invalid Preferences file",
                                           help=self.preferencesFile,
                                           severity=hou.severityType.Error,
-                                          title="Asset Gallery"
+                                          title="ol Gallery"
                                           )
                     if hou.ui.displayConfirmation("Reset preferences file to the defaults?", title="Gallery"):
                         data = {}
@@ -316,16 +353,16 @@ class Gallery(QtWidgets.QWidget):
                     else:
                         self.setMessage('<span class="error"><b>Invalid Preferences File</b> <br><br>{}</span>'.format(self.preferencesFile))
                         self.setDisabled(True)
-                        return
+                        return False
 
-        # If force default folders
-        if kwargs.get("forceDefaultFolders"):
-            self.loadDefaultFolders()
-
-        self.loadMessage()
+        return True
 
     def initialize(self):
+        if not self.isEnabled():
+            return
+
         self.ui.thumbnailSizeSlider.setValue(200)
+
         self.updateRootBox()
 
         self.ui.assetList.installEventFilter(self)
@@ -416,7 +453,7 @@ class Gallery(QtWidgets.QWidget):
                     data[name] = modelInfo
 
             iconsDir = utils.join(PATH, "icons")
-            if os.path.isdir(iconsDir):
+            if os.path.isdir(iconsDir): 
                 for filename in os.listdir(iconsDir):
                     filepath = utils.join(iconsDir, filename)
                     if os.path.isfile(filepath):
@@ -669,7 +706,7 @@ class Gallery(QtWidgets.QWidget):
                 self.ui.rootBox.setItemData(row, QtGui.QColor(rgb[0], rgb[1], rgb[2]), QtCore.Qt.ForegroundRole)
             except KeyError:
                 pass
-
+        
         self.loadStateRoot()
 
         self.ui.rootBox.blockSignals(False)
@@ -964,6 +1001,16 @@ class Gallery(QtWidgets.QWidget):
                 padding: 0;
                 margin: 0;
             }}
+
+            QTreeView {{
+                font: 18px;                
+            }}
+            
+            QTreeView::item {{
+                padding: 3px;
+            }}
+
+
         """.format(r=rgb[0], g=rgb[1], b=rgb[2]))
 
         self.ui.assetList.setStyleSheet("""
@@ -1074,7 +1121,8 @@ class Gallery(QtWidgets.QWidget):
             data = {}
 
         root = self.ui.rootBox.currentText()
-        data["last_root"] = root
+        if root:
+            data["last_root"] = root
 
         data["thumbnail_size"] = self.ui.thumbnailSizeSlider.value()
         data["list_mode"] = self.ui.assetList.viewMode() == QtWidgets.QListView.ListMode
@@ -1181,7 +1229,7 @@ class Gallery(QtWidgets.QWidget):
 
         self.loadState()
 
-    def loadStateFolders(self, preferencesFile=None):
+    def loadStateFolders(self, preferencesFile=None, append=False):
         """
         Loads the folders in the Folder Management tab according to the preferencesFile.
         If not specified, uses self.preferencesFile.
@@ -1203,14 +1251,31 @@ class Gallery(QtWidgets.QWidget):
             self.updateParms()
             return False
 
-        # ---------- Load Folders ----------
+        # ========================================
+        # Gather roots to skip
 
+        rootsToSkip = []
+
+        if append:
+            for i in range(self.ui.foldersTable.rowCount()):
+                if self.ui.foldersTable.item(i, 0):
+                    rootsToSkip.append(self.ui.foldersTable.item(i, 0).text())
+
+        # ========================================
+        # Load Folders
+    
         self.ui.foldersTable.blockSignals(True)
 
         data.setdefault("folders", {})
         if len(data["folders"]) > 0:
-            self.ui.foldersTable.setRowCount(0)
+
+            if not append:
+                self.ui.foldersTable.setRowCount(0)
+
             for root in sorted(data["folders"]):
+                if root in rootsToSkip:
+                    continue
+
                 row = self.ui.foldersTable.rowCount()
                 self.ui.foldersTable.insertRow(row)
                 self.ui.foldersTable.setItem(row, 0, QtWidgets.QTableWidgetItem(root))
@@ -1228,7 +1293,7 @@ class Gallery(QtWidgets.QWidget):
 
         self.ui.foldersTable.blockSignals(False)
 
-    def loadDefaultFolders(self):
+    def loadDefaultFolders(self, append=False):
         """
         Loads the default folders in the Folder Management tab according to the self.default_preferencesFile path.
         Warns if the self.default_preferencesFile wasn't found.
@@ -1239,8 +1304,8 @@ class Gallery(QtWidgets.QWidget):
             hou.ui.displayMessage("Default preferences file not found",
                                   help=self.defaultPreferencesFile, severity=hou.severityType.Error)
 
-        self.loadStateFolders(preferencesFile=self.defaultPreferencesFile)
-        self.loadStateRoot(preferencesFile=self.defaultPreferencesFile)
+        self.loadStateFolders(preferencesFile=self.defaultPreferencesFile, append=append)
+        self.loadStateRoot(preferencesFile=self.preferencesFile)
         self.saveState()
 
     def tabChanged(self, tab_idx):
@@ -1397,11 +1462,20 @@ class Gallery(QtWidgets.QWidget):
 
         self.setCurModelConfig(data)
 
-    def tagItemToggle(self, tagName, item):
+    def tagItemToggle(self, tagName, item, wholeSelection=True):
         on = True
         if tagName in self.getTags(item):
             on = False
-        self.tagItem(tagName, item, on)
+
+        itemList = []
+        if wholeSelection:
+            itemList += self.ui.assetList.selectedItems()
+        else:
+            itemList.append(item)
+
+        for _item in itemList:
+            self.tagItem(tagName, _item, on)
+            _item.setSelected(True)
 
     def getTags(self, item):
         itemId = self.ui.collectionsBox.currentText() + "/" + item.data(0)
@@ -1419,12 +1493,7 @@ class Gallery(QtWidgets.QWidget):
 
     def toggledFavorite(self, row):
         item = self.ui.assetList.item(row)
-        itemList = self.ui.assetList.selectedItems()
-        if item not in itemList:
-            itemList.append(item)
-        for item in itemList:
-            self.tagItemToggle("favorite", item)
-
+        self.tagItemToggle("favorite", item, wholeSelection=True)
         self.filterItems()
 
     def changeColor(self, color, alpha=1):

@@ -39,13 +39,11 @@ class Ui_AssetGallery(object):
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
         self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
         self.rootBox = QComboBox(self.topNavContainer)
-        self.rootBox.addItem("")
         self.rootBox.setObjectName(u"rootBox")
 
         self.horizontalLayout_2.addWidget(self.rootBox)
 
         self.collectionsBox = QComboBox(self.topNavContainer)
-        self.collectionsBox.addItem("")
         self.collectionsBox.setObjectName(u"collectionsBox")
 
         self.horizontalLayout_2.addWidget(self.collectionsBox)
@@ -93,6 +91,7 @@ class Ui_AssetGallery(object):
 
         self.toggleListView = QToolButton(self.libraryTopBarContainer)
         self.toggleListView.setObjectName(u"toggleListView")
+        self.toggleListView.setEnabled(False)
         self.toggleListView.setIconSize(QSize(16, 16))
         self.toggleListView.setCheckable(True)
 
@@ -111,7 +110,11 @@ class Ui_AssetGallery(object):
         self.assetListSplitter.setOrientation(Qt.Horizontal)
         self.treeNav = QTreeWidget(self.assetListSplitter)
         self.treeNav.setObjectName(u"treeNav")
+        self.treeNav.setAutoExpandDelay(0)
+        self.treeNav.setRootIsDecorated(False)
         self.treeNav.setAnimated(True)
+        self.treeNav.setWordWrap(True)
+        self.treeNav.setHeaderHidden(True)
         self.assetListSplitter.addWidget(self.treeNav)
         self.treeNav.header().setDefaultSectionSize(20)
         self.assetList = QListWidget(self.assetListSplitter)
@@ -188,11 +191,7 @@ class Ui_AssetGallery(object):
 
     def retranslateUi(self, AssetGallery):
         AssetGallery.setWindowTitle(QCoreApplication.translate("AssetGallery", u"Form", None))
-        self.rootBox.setItemText(0, QCoreApplication.translate("AssetGallery", u"Root \u2193", None))
-
-        self.collectionsBox.setItemText(0, QCoreApplication.translate("AssetGallery", u"Collection \u2193 ", None))
-
-        self.collectionsBox.setCurrentText(QCoreApplication.translate("AssetGallery", u"Collection \u2193 ", None))
+        self.collectionsBox.setCurrentText("")
         self.searchBar.setPlaceholderText(QCoreApplication.translate("AssetGallery", u"Search string or Pattern (Eg.: tree*01)", None))
 #if QT_CONFIG(tooltip)
         self.toggleFavorites.setToolTip(QCoreApplication.translate("AssetGallery", u"Isolate Favorites", None))

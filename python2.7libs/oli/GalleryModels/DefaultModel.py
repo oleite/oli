@@ -3,11 +3,12 @@
 import os
 import hou
 import toolutils
-from PySide2 import QtWidgets, QtCore
+from PySide2 import QtWidgets, QtCore, QtGui
 import pyperclip
 
 from oli import utils
 from oli import gallery
+
 
 class DefaultModel(object):
     def __init__(self, asset_gallery):
@@ -256,6 +257,28 @@ class DefaultModel(object):
             elif node_type == "layout":
                 ag.import_selected_assets_to_lop_layout()
 
+            elif node_type == "ol::SOP_Instancer":
+                assetCountParm = node.parm("asset_count")
+                startIdx = assetCountParm.eval()
+
+                imported_nodes = ag.importSelectedAssets()
+
+                for idx, importedNode in enumerate(imported_nodes):
+                    idx += startIdx
+                    assetCountParm.set(idx + 1)
+
+                    importedNode.setGenericFlag(hou.nodeFlag.Display, False)
+
+                    sopNode = importedNode.node("OUT_MERGED")
+                    if not sopNode:
+                        sopNode = importedNode.displayNode()
+
+                    pathParm = node.parm("path_%d" % idx)
+                    pathParm.set(sopNode.path())
+                    pathParm.pressButton()
+
+                    node.setSelected(True, True)
+
     def pwdChanged(self, old, new):
         self.Gallery.filterItems()
 
@@ -288,6 +311,8 @@ class DefaultModel(object):
         self.Gallery.collectionPath = hou.text.expandString(self.Gallery.collectionPath)
         self.Gallery.createItems()
 
+        self.Gallery.ui.treeNav.setVisible(bool(self.Gallery.ui.treeNav.topLevelItemCount()))
+
     def refresh(self):
         self.Gallery.loadState()
 
@@ -302,6 +327,10 @@ class DefaultModel(object):
         childrenValues = [tree.topLevelItem(idx).text(0) for idx in range(tree.topLevelItemCount())]
         if topCat in childrenValues:
             item = tree.topLevelItem(childrenValues.index(topCat))
+
+            font = QtGui.QFont("", -1, QtGui.QFont.Bold)
+            font.setUnderline(True)
+            item.setFont(0, font)
         else:
             item = QtWidgets.QTreeWidgetItem(tree, [topCat, ])
 
