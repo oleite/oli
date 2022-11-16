@@ -13,6 +13,7 @@ import toolutils
 from PySide2 import QtWidgets, QtCore
 
 from oli import utils
+from oli import gallery
 from oli.GalleryModels import DefaultModel
 
 reload(DefaultModel)
@@ -143,6 +144,8 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
         if "asset_display_name" in itemData:
             display_name = itemData["asset_display_name"]
 
+        _id = "{}/{}".format(category, asset_name)
+
         itemData.update({
             "asset_name": asset_name,
             "asset_display_name": display_name,
@@ -150,11 +153,12 @@ class HoudiniNodeSetups(DefaultModel.DefaultModel):
             "setup_file": setup_file,
             "info_file": info_file,
             "category": category,
-            "tags": self.Gallery.getTagsFromId(self.Gallery.ui.collectionsBox.currentText() + "/" + display_name),
+            "tags": self.Gallery.getTagsFromId(_id),
         })
 
         item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_display_name"])
         item.setData(QtCore.Qt.UserRole, itemData)
+        item.setData(gallery.ITEM_ID_ROLE, _id)
 
         self.Gallery.updateItemTooltip(item)
         self.Gallery.ui.assetList.addItem(item)

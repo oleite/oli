@@ -28,10 +28,10 @@ class Ui_AssetGallery(object):
 #endif // QT_CONFIG(whatsthis)
         self.libraryTab = QWidget()
         self.libraryTab.setObjectName(u"libraryTab")
-        self.verticalLayout = QVBoxLayout(self.libraryTab)
-        self.verticalLayout.setSpacing(5)
-        self.verticalLayout.setObjectName(u"verticalLayout")
-        self.verticalLayout.setContentsMargins(0, 5, 0, 0)
+        self.verticalLayout_4 = QVBoxLayout(self.libraryTab)
+        self.verticalLayout_4.setSpacing(3)
+        self.verticalLayout_4.setObjectName(u"verticalLayout_4")
+        self.verticalLayout_4.setContentsMargins(0, 3, 0, 0)
         self.topNavContainer = QWidget(self.libraryTab)
         self.topNavContainer.setObjectName(u"topNavContainer")
         self.horizontalLayout_2 = QHBoxLayout(self.topNavContainer)
@@ -49,7 +49,7 @@ class Ui_AssetGallery(object):
         self.horizontalLayout_2.addWidget(self.collectionsBox)
 
 
-        self.verticalLayout.addWidget(self.topNavContainer)
+        self.verticalLayout_4.addWidget(self.topNavContainer)
 
         self.libraryTopBarContainer = QWidget(self.libraryTab)
         self.libraryTopBarContainer.setObjectName(u"libraryTopBarContainer")
@@ -98,7 +98,7 @@ class Ui_AssetGallery(object):
         self.horizontalLayout.addWidget(self.toggleListView)
 
 
-        self.verticalLayout.addWidget(self.libraryTopBarContainer)
+        self.verticalLayout_4.addWidget(self.libraryTopBarContainer)
 
         self.assetListSplitter = QSplitter(self.libraryTab)
         self.assetListSplitter.setObjectName(u"assetListSplitter")
@@ -108,15 +108,24 @@ class Ui_AssetGallery(object):
         sizePolicy.setHeightForWidth(self.assetListSplitter.sizePolicy().hasHeightForWidth())
         self.assetListSplitter.setSizePolicy(sizePolicy)
         self.assetListSplitter.setOrientation(Qt.Horizontal)
-        self.treeNav = QTreeWidget(self.assetListSplitter)
+        self.leftNavWidget = QWidget(self.assetListSplitter)
+        self.leftNavWidget.setObjectName(u"leftNavWidget")
+        self.verticalLayout = QVBoxLayout(self.leftNavWidget)
+        self.verticalLayout.setSpacing(0)
+        self.verticalLayout.setObjectName(u"verticalLayout")
+        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
+        self.treeNav = QTreeWidget(self.leftNavWidget)
         self.treeNav.setObjectName(u"treeNav")
         self.treeNav.setAutoExpandDelay(0)
         self.treeNav.setRootIsDecorated(False)
         self.treeNav.setAnimated(True)
         self.treeNav.setWordWrap(True)
         self.treeNav.setHeaderHidden(True)
-        self.assetListSplitter.addWidget(self.treeNav)
         self.treeNav.header().setDefaultSectionSize(20)
+
+        self.verticalLayout.addWidget(self.treeNav)
+
+        self.assetListSplitter.addWidget(self.leftNavWidget)
         self.assetList = QListWidget(self.assetListSplitter)
         self.assetList.setObjectName(u"assetList")
         self.assetList.setAcceptDrops(True)
@@ -130,14 +139,14 @@ class Ui_AssetGallery(object):
         self.assetList.setUniformItemSizes(False)
         self.assetListSplitter.addWidget(self.assetList)
 
-        self.verticalLayout.addWidget(self.assetListSplitter)
+        self.verticalLayout_4.addWidget(self.assetListSplitter)
 
         self.messageBrowser = QTextBrowser(self.libraryTab)
         self.messageBrowser.setObjectName(u"messageBrowser")
         self.messageBrowser.setMaximumSize(QSize(16777215, 0))
         self.messageBrowser.setOpenExternalLinks(True)
 
-        self.verticalLayout.addWidget(self.messageBrowser)
+        self.verticalLayout_4.addWidget(self.messageBrowser)
 
         self.tabWidget.addTab(self.libraryTab, "")
         self.folderManagementTab = QWidget()
@@ -173,7 +182,6 @@ class Ui_AssetGallery(object):
         self.searchBar.textChanged.connect(AssetGallery.filterItems)
         self.collectionsBox.currentTextChanged.connect(AssetGallery.collectionChanged)
         self.thumbnailSizeSlider.valueChanged.connect(AssetGallery.thumbnailResize)
-        self.assetList.itemDoubleClicked.connect(AssetGallery.import_asset)
         self.toggleListView.toggled.connect(AssetGallery.toggleListView)
         self.foldersTable.customContextMenuRequested.connect(AssetGallery.spawnFoldersTableContextMenu)
         self.thumbnailSizeSlider.sliderReleased.connect(AssetGallery.saveState)
@@ -182,6 +190,7 @@ class Ui_AssetGallery(object):
         self.tabWidget.currentChanged.connect(AssetGallery.tabChanged)
         self.toggleFavorites.toggled.connect(AssetGallery.toggleFavoritesOnly)
         self.treeNav.currentItemChanged.connect(AssetGallery.treeNavItemChanged)
+        self.assetList.itemDoubleClicked.connect(AssetGallery.import_asset)
 
         self.tabWidget.setCurrentIndex(0)
 
@@ -191,7 +200,13 @@ class Ui_AssetGallery(object):
 
     def retranslateUi(self, AssetGallery):
         AssetGallery.setWindowTitle(QCoreApplication.translate("AssetGallery", u"Form", None))
+#if QT_CONFIG(tooltip)
+        self.collectionsBox.setToolTip("")
+#endif // QT_CONFIG(tooltip)
         self.collectionsBox.setCurrentText("")
+#if QT_CONFIG(tooltip)
+        self.searchBar.setToolTip("")
+#endif // QT_CONFIG(tooltip)
         self.searchBar.setPlaceholderText(QCoreApplication.translate("AssetGallery", u"Search string or Pattern (Eg.: tree*01)", None))
 #if QT_CONFIG(tooltip)
         self.toggleFavorites.setToolTip(QCoreApplication.translate("AssetGallery", u"Isolate Favorites", None))

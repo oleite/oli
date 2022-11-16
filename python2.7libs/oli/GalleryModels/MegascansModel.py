@@ -23,6 +23,51 @@ class MegascansModel(DefaultModel.DefaultModel):
     def __init__(self, ag):
         super(MegascansModel, self).__init__(ag)
 
+        self.rendererWidget = QtWidgets.QWidget()
+        self.rendererWidgetLayout = QtWidgets.QHBoxLayout()
+        self.rendererWidget.setLayout(self.rendererWidgetLayout)
+
+        # label = QtWidgets.QLabel("Renderer:")
+        # self.rendererWidgetLayout.addWidget(label)
+
+        self.rendererComboBox = QtWidgets.QComboBox()
+        self.rendererWidgetLayout.addWidget(self.rendererComboBox)
+
+        self.rendererComboBox.currentTextChanged.connect(self.rendererChanged)
+        self.rendererComboBox.setToolTip("Renderer")
+
+        self.rendererComboBox.blockSignals(True)
+        
+        # Add available renderers to comboBox
+        for val in ["VRay", "MaterialX"]:
+            self.rendererComboBox.addItem(val)
+
+        # Load from preferences
+        renderer = self.Gallery.getCurModelConfig().get("renderer")
+        if renderer:
+            self.rendererComboBox.setCurrentText(renderer)
+        
+        self.rendererComboBox.blockSignals(False)
+
+        self.rendererWidgetLayout.setSpacing(10)
+        self.rendererWidgetLayout.setContentsMargins(10, 3, 10, 3)
+        
+        self.rendererWidget.setStyleSheet("""
+            QComboBox {
+                font: 18px;
+            }
+            QComboBox::drop-down {
+                min-width: 0px;
+            }
+        """)
+
+        self.Gallery.ui.leftNavWidget.layout().addWidget(self.rendererWidget)
+
+    def rendererChanged(self, val):
+        self.Gallery.updateCurModelConfig({
+            "renderer": val,
+        })
+
     def assetListContextMenu(self, event, itemList):
         if not self.valid:
             return False
@@ -157,12 +202,13 @@ class MegascansModel(DefaultModel.DefaultModel):
             "thumbnail_path": self.Gallery.format_pattern(asset_name,
                                                           "__ROOT__/__COLLECTION__/__ASSET__/*_Preview.png"),
             "ms_id": ms_dict["id"],
-            "tags": self.Gallery.getTagsFromId(self.Gallery.ui.collectionsBox.currentText() + "/" + display_name),
+            "tags": self.Gallery.getTagsFromId(ms_dict["id"]),
             "category": category
         })
 
         item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_display_name"])
         item.setData(QtCore.Qt.UserRole, itemData)
+        item.setData(gallery.ITEM_ID_ROLE, ms_dict["id"])
 
         self.Gallery.updateItemTooltip(item)
         self.Gallery.ui.assetList.addItem(item)
@@ -255,7 +301,8 @@ class MegascansModel(DefaultModel.DefaultModel):
 
             objNode = obj.createNode("geo", nodeName)
             matnet = objNode.createNode("matnet", "materials")
-            vraySubnet = self.buildVRayMaterials(matnet, textures, nodeName)
+            material = self.buildMaterial(textures, nodeName, matnet)
+
 
             if msType == "Atlas" and "opacity" in textures:
                 opacityMap = textures["opacity"]
@@ -339,21 +386,149 @@ class MegascansModel(DefaultModel.DefaultModel):
             return objNode
 
         else:
-            network_editor = toolutils.networkEditor()
-            pwd = network_editor.pwd()
-            if pwd.childTypeCategory().name() == "Vop":
-                matnet = pwd
-            else:
-                matnet = hou.node("/mat")
-
-            vraySubnet = self.buildVRayMaterials(matnet, textures, nodeName)
-
-            matnet.layoutChildren()
-            vraySubnet.setSelected(True, True)
-            return vraySubnet
+            material = self.buildMaterial(textures, nodeName)
+            if material:
+                material.setSelected(True, True)
+            return material
 
     @staticmethod
-    def buildVRayMaterials(matnet, textures, nodeName):
+    def createMatnet(parent, name=None, paneTab=None):
+        category = parent.childTypeCategory().name()
+        matnet = None
+
+        if category == "Vop":
+            matnet = parent
+
+        elif category == "Lop":
+            matnet = parent.createNode("materiallibrary")
+            
+            if paneTab:
+                matnet.setPosition(paneTab.cursorPosition())
+                matnet.move((-.5, -.2))
+        else:
+            matnet = hou.node("/mat")
+
+        if name:
+            matnet.setName(name, True)
+        return matnet
+
+    def buildMaterial(self, textures, name, matnet=None):
+        if not matnet:           
+
+            paneTab = hou.ui.paneTabUnderCursor()
+            paneTabType = paneTab.type()
+
+            if paneTabType == hou.paneTabType.NetworkEditor:
+                pwd = paneTab.pwd()
+                matnet = self.createMatnet(pwd, name, paneTab=paneTab)
+            else:
+                pwd = toolutils.networkEditor().pwd()
+                matnet = self.createMatnet(pwd, name)
+
+        choice = self.rendererComboBox.currentText()
+
+        if choice == "VRay":
+            self.buildVRayMaterial(textures, name, matnet)
+        elif choice == "MaterialX":
+            self.buildMaterialXMaterial(textures, name, matnet)
+        else:
+            hou.ui.displayMessage('"{}" materials not supported.'.format(choice))
+            return
+
+        matnet.layoutChildren()
+
+    @staticmethod
+    def buildMaterialXMaterial(textures, nodeName, matnet):
+        subnet = matnet.createNode("subnet", nodeName)
+        subnet.setGenericFlag(hou.nodeFlag.Material, True)
+
+        for n in subnet.children():
+            n.destroy()
+
+        displacementOutput = subnet.createNode("subnetconnector", "displacement_output")
+        displacementOutput.setParms({
+            "connectorkind": "output",
+            "parmname": "displacement",
+            "parmlabel": "Displacement",
+            "parmtype": "displacement",
+        })
+
+        surfaceOutput = subnet.createNode("subnetconnector", "surface_output")
+        surfaceOutput.setParms({
+            "connectorkind": "output",
+            "parmname": "surface",
+            "parmlabel": "Surface",
+            "parmtype": "surface",
+        })
+
+        mtlxStdSurface = surfaceOutput.createInputNode(0, "mtlxstandard_surface") 
+
+        albedoMap = textures.pop("albedo", None)
+        opacityMap = textures.pop("opacity", None)
+        roughnessMap = textures.pop("roughness", None)
+        normalMap = textures.pop("normal", None)
+        displacementMap = textures.pop("displacement", None)
+        translucencyMap = textures.pop("translucency", None)
+
+        if albedoMap:
+            mtlxImage = subnet.createNode("mtlximage", "albedo_map")
+            mtlxStdSurface.setNamedInput("base_color", mtlxImage, 0)
+            mtlxImage.setParms({
+                "signature": "color3",
+                "file": albedoMap,
+            })
+
+        if opacityMap:
+            mtlxImage = subnet.createNode("mtlximage", "opacity_map")
+            mtlxStdSurface.setNamedInput("opacity", mtlxImage, 0)
+            mtlxImage.setParms({
+                "signature": "opacity",
+                "file": opacityMap,
+            })
+
+        if roughnessMap:
+            mtlxImage = subnet.createNode("mtlximage", "roughness_map")
+            mtlxStdSurface.setNamedInput("specular_roughness", mtlxImage, 0)
+            mtlxImage.setParms({
+                "signature": "default",
+                "file": roughnessMap,
+            })
+
+        if normalMap:
+            mapNormal = subnet.createNode("mtlxnormalmap", "map_normals")
+            mtlxStdSurface.setNamedInput("normal", mapNormal, 0)
+
+            mtlxImage = mapNormal.createInputNode(0, "mtlximage", "normap_map")
+            mtlxImage.setParms({
+                "signature": "vector3",
+                "file": normalMap,
+            })
+
+        if displacementMap:
+            mtlxDisplacement = displacementOutput.createInputNode(0, "mtlxdisplacement")
+            mtlxDisplacement.parm("scale").set(.01)
+
+            mtlxImage = mtlxDisplacement.createInputNode(0, "mtlximage", "displacement_map")
+            mtlxImage.setParms({
+                "signature": "default",
+                "file": displacementMap,
+            })
+
+        if translucencyMap:
+            mtlxImage = subnet.createNode("mtlximage", "translucency_map")
+            mtlxStdSurface.setNamedInput("subsurface_color", mtlxImage, 0)
+            mtlxImage.setParms({
+                "signature": "color3",
+                "file": translucencyMap,
+            })
+            mtlxStdSurface.parm("subsurface").set(1)
+
+        subnet.layoutChildren()
+        return subnet
+
+
+    @staticmethod
+    def buildVRayMaterial(textures, nodeName, matnet):
         vraySubnet = matnet.createNode("vray_vop_material", nodeName)
         vrayMtl = vraySubnet.node("vrayMtl")
         vrayOutput = vraySubnet.node("vrayOutput")

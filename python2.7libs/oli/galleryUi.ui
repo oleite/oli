@@ -38,15 +38,15 @@
       <attribute name="title">
        <string>Library</string>
       </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout">
+      <layout class="QVBoxLayout" name="verticalLayout_4">
        <property name="spacing">
-        <number>5</number>
+        <number>3</number>
        </property>
        <property name="leftMargin">
         <number>0</number>
        </property>
        <property name="topMargin">
-        <number>5</number>
+        <number>3</number>
        </property>
        <property name="rightMargin">
         <number>0</number>
@@ -73,10 +73,17 @@
            <number>0</number>
           </property>
           <item>
-           <widget class="QComboBox" name="rootBox"/>
+           <widget class="QComboBox" name="rootBox">
+            <property name="toolTip">
+             <string>Folder</string>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QComboBox" name="collectionsBox">
+            <property name="toolTip">
+             <string>Collection</string>
+            </property>
             <property name="currentText">
              <string/>
             </property>
@@ -102,6 +109,9 @@
           </property>
           <item>
            <widget class="QLineEdit" name="searchBar">
+            <property name="toolTip">
+             <string extracomment="Folder"/>
+            </property>
             <property name="placeholderText">
              <string>Search string or Pattern (Eg.: tree*01)</string>
             </property>
@@ -231,30 +241,51 @@
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
-         <widget class="QTreeWidget" name="treeNav">
-          <property name="autoExpandDelay">
-           <number>0</number>
-          </property>
-          <property name="rootIsDecorated">
-           <bool>false</bool>
-          </property>
-          <property name="animated">
-           <bool>true</bool>
-          </property>
-          <property name="wordWrap">
-           <bool>true</bool>
-          </property>
-          <property name="headerHidden">
-           <bool>true</bool>
-          </property>
-          <attribute name="headerDefaultSectionSize">
-           <number>20</number>
-          </attribute>
-          <column>
-           <property name="text">
-            <string>Category</string>
+         <widget class="QWidget" name="leftNavWidget" native="true">
+          <layout class="QVBoxLayout" name="verticalLayout">
+           <property name="spacing">
+            <number>0</number>
            </property>
-          </column>
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="QTreeWidget" name="treeNav">
+             <property name="autoExpandDelay">
+              <number>0</number>
+             </property>
+             <property name="rootIsDecorated">
+              <bool>false</bool>
+             </property>
+             <property name="animated">
+              <bool>true</bool>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+             <property name="headerHidden">
+              <bool>true</bool>
+             </property>
+             <attribute name="headerDefaultSectionSize">
+              <number>20</number>
+             </attribute>
+             <column>
+              <property name="text">
+               <string>Category</string>
+              </property>
+             </column>
+            </widget>
+           </item>
+          </layout>
          </widget>
          <widget class="QListWidget" name="assetList">
           <property name="acceptDrops">
@@ -416,22 +447,6 @@
    </hints>
   </connection>
   <connection>
-   <sender>assetList</sender>
-   <signal>itemDoubleClicked(QListWidgetItem*)</signal>
-   <receiver>AssetGallery</receiver>
-   <slot>import_asset()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>380</x>
-     <y>213</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>496</x>
-     <y>0</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
    <sender>toggleListView</sender>
    <signal>toggled(bool)</signal>
    <receiver>AssetGallery</receiver>
@@ -556,6 +571,22 @@
     <hint type="destinationlabel">
      <x>71</x>
      <y>-256</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>assetList</sender>
+   <signal>itemDoubleClicked(QListWidgetItem*)</signal>
+   <receiver>AssetGallery</receiver>
+   <slot>import_asset()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>380</x>
+     <y>213</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>496</x>
+     <y>0</y>
     </hint>
    </hints>
   </connection>

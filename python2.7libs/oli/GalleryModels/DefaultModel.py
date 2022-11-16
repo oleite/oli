@@ -172,14 +172,18 @@ class DefaultModel(object):
         return items
 
     def createItem(self, asset_name):
+        _id = "{}/{}".format(self.Gallery.ui.collectionsBox.currentText(), itemData["asset_name"])
+
         itemData = {
             "asset_name": asset_name,
             "asset_display_name": asset_name.replace("_", " "),
             "thumbnail_path": None,
+            "tags": self.Gallery.getTagsFromId(_id),
         }
 
         item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_display_name"])
         item.setData(QtCore.Qt.UserRole, itemData)
+        item.setData(gallery.ITEM_ID_ROLE, _id)
 
         self.Gallery.updateItemTooltip(item)
         self.Gallery.ui.assetList.addItem(item)
@@ -311,7 +315,7 @@ class DefaultModel(object):
         self.Gallery.collectionPath = hou.text.expandString(self.Gallery.collectionPath)
         self.Gallery.createItems()
 
-        self.Gallery.ui.treeNav.setVisible(bool(self.Gallery.ui.treeNav.topLevelItemCount()))
+        self.Gallery.ui.leftNavWidget.setVisible(bool(self.Gallery.ui.treeNav.topLevelItemCount()))
 
     def refresh(self):
         self.Gallery.loadState()

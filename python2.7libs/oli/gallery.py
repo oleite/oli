@@ -20,6 +20,7 @@ from . import utils
 
 iconsPath = hou.getenv("OLI_ICONS")
 
+ITEM_ID_ROLE = QtCore.Qt.UserRole + 1
 ITEM_THUMBNAIL_PIXMAP_ROLE = QtCore.Qt.UserRole + 11
 ITEM_BADGES_LIST_ROLE = QtCore.Qt.UserRole + 12
 
@@ -591,6 +592,9 @@ class Gallery(QtWidgets.QWidget):
             # Menu Item: Add Item
             action_add_item = QtWidgets.QAction("Add Item", self)
             action_add_item.setProperty("action", "add_item")
+            font = action_add_item.font()
+            font.setBold(True)
+            action_add_item.setFont(font)
             menu.addAction(action_add_item)
 
             # Menu Item: Open Preferences File
@@ -932,6 +936,8 @@ class Gallery(QtWidgets.QWidget):
 
         # self.ui.assetList.setUniformItemSizes(True)
 
+        self.ui.foldersTable.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch);
+
         self.setStyleSheet("""
             Gallery {{
                 background: #2e2e2e;
@@ -1003,7 +1009,8 @@ class Gallery(QtWidgets.QWidget):
             }}
 
             QTreeView {{
-                font: 18px;                
+                background: #2e2e2e;
+                font: 18px; 
             }}
             
             QTreeView::item {{
@@ -1443,8 +1450,7 @@ class Gallery(QtWidgets.QWidget):
         # =========================
         # Update Model Config State
 
-        itemId = self.ui.collectionsBox.currentText() + "/" + item.data(0)
-        itemId = itemId.strip()
+        itemId = item.data(ITEM_ID_ROLE)
 
         data = self.getCurModelConfig()
 
@@ -1478,17 +1484,15 @@ class Gallery(QtWidgets.QWidget):
             _item.setSelected(True)
 
     def getTags(self, item):
-        itemId = self.ui.collectionsBox.currentText() + "/" + item.data(0)
-        return self.getTagsFromId(itemId)
+        return self.getTagsFromId(item.data(ITEM_ID_ROLE))
 
     def getTagsFromId(self, itemId):
-        itemId = itemId.strip()
-        data = self.getCurModelConfig()
-
         tags = []
-        for tag, targets in data.get("tags", {}).items():
-            if itemId in targets:
-                tags.append(tag)
+        if itemId:
+            data = self.getCurModelConfig()
+            for tag, targets in data.get("tags", {}).items():
+                if itemId in targets:
+                    tags.append(tag)
         return tags
 
     def toggledFavorite(self, row):
