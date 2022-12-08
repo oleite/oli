@@ -66,6 +66,14 @@ def centralizeNodes(selection):
     return targetPos
 
 
+def moveNodeToCursor(node, paneTab=None):
+    if not paneTab:
+        paneTab = toolutils.networkEditor()
+
+    node.setPosition(paneTab.cursorPosition())
+    node.move((-.5, -.2))
+
+
 def flashMessage(message, duration):
     """
 
@@ -114,7 +122,7 @@ def cameraFrameGeometry(nodeOrGeometry, camera=None):
 
 
 def patternMatchFile(path):
-    path = os.path.normpath(path).replace("\\", "/")
+    path = normpath(path)
     if "*" in path:
         split = path.rsplit("/", 1)
         if not os.path.exists(split[0]):
@@ -162,7 +170,7 @@ def copytree(src, dst, symlinks=False, ignore=None):
 
 def normpath(path):
     if path:
-        path = path.replace("\\", "/").replace("//", "/")
+        path = os.path.normpath(path).replace("\\", "/")
     else:
         path = ""
     return path

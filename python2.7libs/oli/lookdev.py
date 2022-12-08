@@ -8,6 +8,7 @@ import shutil
 
 import hou
 import json
+import toolutils
 
 from . import utils
 
@@ -157,3 +158,198 @@ def add_to_ol_instancer(node, directory):
         node.parm("filepath_%i_%i" % (idx1, idx2)).set(asset_path)
 
     return None
+
+
+def createMatnet(parent, name=None, paneTab=None):
+    category = parent.childTypeCategory().name()
+    matnet = None
+
+    if category == "Vop":
+        matnet = parent
+
+    elif category == "Lop":
+        matnet = parent.createNode("materiallibrary", name)
+        utils.moveNodeToCursor(matnet, paneTab)
+
+    elif category == "Obj":
+        matnet = parent.createNode("matnet", name)
+        utils.moveNodeToCursor(matnet, paneTab)
+
+    else:
+        matnet = hou.node("/mat")
+
+    return matnet
+
+
+def buildMaterialOfRenderer(renderer, textures, name, matnet=None):
+    if not matnet:           
+        paneTab = hou.ui.paneTabUnderCursor()
+        paneTabType = paneTab.type()
+
+        if paneTabType == hou.paneTabType.NetworkEditor:
+            pwd = paneTab.pwd()
+            matnet = createMatnet(pwd, name, paneTab=paneTab)
+        else:
+            pwd = toolutils.networkEditor().pwd()
+            matnet = createMatnet(pwd, name)
+
+    if renderer == "VRay":
+        buildVRayMaterial(textures, name, matnet)
+    elif renderer == "MaterialX":
+        if hou.applicationVersion() < (19, 0, 0):
+            hou.ui.displayMessage('MaterialX is only supported in Houdini 19 or greater.')
+            return
+
+        buildMaterialXMaterial(textures, name, matnet)
+    else:
+        hou.ui.displayMessage('"{}" materials not supported.'.format(renderer))
+        return
+
+
+def buildMaterialXMaterial(textures, nodeName, matnet):
+    subnet = matnet.createNode("subnet", nodeName)
+    subnet.setGenericFlag(hou.nodeFlag.Material, True)
+
+    for n in subnet.children():
+        n.destroy()
+
+    displacementOutput = subnet.createNode("subnetconnector", "displacement_output")
+    displacementOutput.setParms({
+        "connectorkind": "output",
+        "parmname": "displacement",
+        "parmlabel": "Displacement",
+        "parmtype": "displacement",
+    })
+
+    surfaceOutput = subnet.createNode("subnetconnector", "surface_output")
+    surfaceOutput.setParms({
+        "connectorkind": "output",
+        "parmname": "surface",
+        "parmlabel": "Surface",
+        "parmtype": "surface",
+    })
+
+    mtlxStdSurface = surfaceOutput.createInputNode(0, "mtlxstandard_surface") 
+
+    albedoMap = textures.pop("albedo", None)
+    opacityMap = textures.pop("opacity", None)
+    roughnessMap = textures.pop("roughness", None)
+    normalMap = textures.pop("normal", None)
+    displacementMap = textures.pop("displacement", None)
+    translucencyMap = textures.pop("translucency", None)
+
+    if albedoMap:
+        mtlxImage = subnet.createNode("mtlximage", "albedo_map")
+        mtlxStdSurface.setNamedInput("base_color", mtlxImage, 0)
+        mtlxImage.setParms({
+            "signature": "color3",
+            "file": albedoMap,
+        })
+
+    if opacityMap:
+        mtlxImage = subnet.createNode("mtlximage", "opacity_map")
+        mtlxStdSurface.setNamedInput("opacity", mtlxImage, 0)
+        mtlxImage.setParms({
+            "signature": "opacity",
+            "file": opacityMap,
+        })
+
+    if roughnessMap:
+        mtlxImage = subnet.createNode("mtlximage", "roughness_map")
+        mtlxStdSurface.setNamedInput("specular_roughness", mtlxImage, 0)
+        mtlxImage.setParms({
+            "signature": "default",
+            "file": roughnessMap,
+        })
+
+    if normalMap:
+        mapNormal = subnet.createNode("mtlxnormalmap", "map_normals")
+        mtlxStdSurface.setNamedInput("normal", mapNormal, 0)
+
+        mtlxImage = mapNormal.createInputNode(0, "mtlximage", "normap_map")
+        mtlxImage.setParms({
+            "signature": "vector3",
+            "file": normalMap,
+        })
+
+    if displacementMap:
+        mtlxDisplacement = displacementOutput.createInputNode(0, "mtlxdisplacement")
+        mtlxDisplacement.parm("scale").set(.01)
+
+        mtlxImage = mtlxDisplacement.createInputNode(0, "mtlximage", "displacement_map")
+        mtlxImage.setParms({
+            "signature": "default",
+            "file": displacementMap,
+        })
+
+    if translucencyMap:
+        mtlxImage = subnet.createNode("mtlximage", "translucency_map")
+        mtlxStdSurface.setNamedInput("subsurface_color", mtlxImage, 0)
+        mtlxImage.setParms({
+            "signature": "color3",
+            "file": translucencyMap,
+        })
+        mtlxStdSurface.parm("subsurface").set(1)
+
+    subnet.layoutChildren()
+    return subnet
+
+
+def buildVRayMaterial(textures, nodeName, matnet):
+    vraySubnet = matnet.createNode("vray_vop_material", nodeName)
+    vrayMtl = vraySubnet.node("vrayMtl")
+    vrayOutput = vraySubnet.node("vrayOutput")
+
+    def imageFileNode(imgPath, name, colorSpace="lin_srgb"):
+        node = vraySubnet.createNode("VRayNodeMetaImageFile", name)
+        node.parm("BitmapBuffer_file").set(imgPath)
+        node.parm("BitmapBuffer_rgb_color_space").set(colorSpace)
+        if colorSpace == "raw":
+            node.parm("BitmapBuffer_color_space").set("0")
+        return node
+
+    vrayMtl.parmTuple("reflect").set((1, 1, 1, 1))
+
+    albedoMap = textures.get("albedo")
+    opacityMap = textures.get("opacity")
+    roughnessMap = textures.get("roughness")
+    normalMap = textures.get("normal")
+    displacementMap = textures.get("displacement")
+    translucencyMap = textures.get("translucency")
+
+    if albedoMap:
+        fileNode = imageFileNode(albedoMap, "albedo_map", "lin_srgb")
+        vrayMtl.setNamedInput("diffuse", fileNode, 0)
+        vraySubnet.parm("ogl_tex1").set(albedoMap)
+
+    if opacityMap:
+        fileNode = imageFileNode(opacityMap, "opacity_map", "raw")
+        vrayMtl.setNamedInput("opacity", fileNode, 0)
+        vraySubnet.parm("ogl_opacitymap").set(opacityMap)
+
+    if roughnessMap:
+        fileNode = imageFileNode(roughnessMap, "roughness_map", "raw")
+        invert = fileNode.createOutputNode("VRayNodeTexInvert", "invert_to_glossiness")
+        vrayMtl.setNamedInput("reflect_glossiness", invert, 0)
+        # vrayMtl.parm("option_use_roughness").set("1")   # Doesn't work with VRay RTX
+
+    if normalMap:
+        fileNode = imageFileNode(normalMap, "normal_map", "raw")
+        vrayMtl.setNamedInput("bump_map", fileNode, 0)
+        vrayMtl.parm("bump_type").set("1")  # Bump Type: Normal (Tangent)
+
+    if displacementMap:
+        fileNode = imageFileNode(displacementMap, "displacement_map", "raw")
+        displacement = fileNode.createOutputNode("VRayNodeGeomDisplacedMesh")
+        displacement.parm("displacement_amount").set(.01)
+        displacement.parm("displacement_shift").setExpression("ch('displacement_amount')/-2")
+        vrayOutput.setInput(1, displacement)
+
+    if translucencyMap:
+        fileNode = imageFileNode(translucencyMap, "translucency_map", "lin_srgb")
+        twoSided = vrayMtl.createOutputNode("VRayNodeMtl2Sided", "twoSidedMtl")
+        twoSided.setNamedInput("translucency_tex", fileNode, 0)
+        vrayOutput.setInput(0, twoSided)
+
+    vraySubnet.layoutChildren()
+    return vraySubnet
