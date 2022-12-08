@@ -194,6 +194,11 @@ def buildMaterialOfRenderer(renderer, textures, name, matnet=None):
             matnet = createMatnet(pwd, name)
 
     if renderer == "VRay":
+        try:
+            import vray
+        except ImportError:
+            raise hou.Error("VRay is not installed")
+
         buildVRayMaterial(textures, name, matnet)
     elif renderer == "MaterialX":
         if hou.applicationVersion() < (19, 0, 0):
