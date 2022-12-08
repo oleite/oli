@@ -250,9 +250,15 @@ class MegascansModel(DefaultModel.DefaultModel):
                 return
 
             def getLOD(abcPath):
-                split = abcPath.split("_LOD")
-                root = split[0]
-                lod = int(split[-1].replace(".abc", ""))
+                splitted = abcPath.split("_LOD")
+                
+                root = splitted[0]
+                
+                if len(splitted) > 1:
+                    lod = int(splitted[-1].replace(".abc", ""))
+                else:
+                    lod = -1
+                
                 return root, lod
 
             name = os.path.split(_path)[-1]
@@ -428,6 +434,11 @@ class MegascansModel(DefaultModel.DefaultModel):
         choice = self.rendererComboBox.currentText()
 
         if choice == "VRay":
+            try:
+                import vray
+            except ImportError:
+                raise hou.Error("VRay is not installed")
+            
             self.buildVRayMaterial(textures, name, matnet)
         elif choice == "MaterialX":
             self.buildMaterialXMaterial(textures, name, matnet)
