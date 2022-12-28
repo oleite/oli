@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import datetime
 import importlib
 import os
 import sys
@@ -7,11 +8,13 @@ import time
 import webbrowser
 from imp import reload
 
-import PySide2
 import hou
 import toolutils
-from PySide2 import QtGui, QtWidgets, QtCore
 import json
+
+from PySide2.QtCore import *
+from PySide2.QtGui import *
+from PySide2.QtWidgets import *
 
 from . import galleryUi
 from . import lookdev
@@ -20,9 +23,9 @@ from . import utils
 
 iconsPath = hou.getenv("OLI_ICONS")
 
-ITEM_ID_ROLE = QtCore.Qt.UserRole + 1
-ITEM_THUMBNAIL_PIXMAP_ROLE = QtCore.Qt.UserRole + 11
-ITEM_BADGES_LIST_ROLE = QtCore.Qt.UserRole + 12
+ITEM_ID_ROLE = Qt.UserRole + 1
+ITEM_THUMBNAIL_PIXMAP_ROLE = Qt.UserRole + 11
+ITEM_BADGES_LIST_ROLE = Qt.UserRole + 12
 
 
 def openGallery(attemptSplit=True, **kwargs):
@@ -56,7 +59,7 @@ def openGallery(attemptSplit=True, **kwargs):
 
 
 def rectShrink(rect, x, y):
-    shrink = QtCore.QPoint(x, y)
+    shrink = QPoint(x, y)
     rect.setTopLeft(rect.topLeft() + shrink)
     rect.setBottomRight(rect.bottomRight() - shrink)
     return rect
@@ -68,35 +71,106 @@ def errHandler(msg_type, msg_log_context, msg_string):
     print(msg_type, msg_log_context, msg_string)
 
 
-class MyDelegate(QtWidgets.QStyledItemDelegate):
+# self.dialog.setWindowFlags(Qt.FramelessWindowHint)
+# self.dialog.move(QCursor.pos())
+
+
+
+
+class Dialog(QDialog):
+    def __init__(self, message, title="Houdini", hold=0.1, pos=None):
+        self.parent = hou.qt.mainWindow()
+        super(Dialog, self).__init__(self.parent)
+        
+        self.hold = hold
+        if pos:
+            self.pos = pos
+        else:
+            pos = QCursor.pos()
+        
+        self.setWindowTitle(title)
+        self.setMinimumSize(250, 100)
+        
+        # add message to the dialog
+        self.label = QLabel(message)
+        self.label.setAlignment(Qt.AlignCenter)
+        
+        font = self.label.font()
+        font.setBold(True)
+        font.setPixelSize(font.pixelSize() * 1.5)
+        
+        self.label.setFont(font)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.label)
+        self.setLayout(layout)
+
+        # Add red border to left side of dialog
+        self.setStyleSheet("QDialog {border-left: 5px solid orange;}")
+
+        # Add a drop shadow to the dialog
+        self.shadow = QGraphicsDropShadowEffect(self)
+        self.shadow.setBlurRadius(100)
+        self.shadow.setOffset(30)
+        self.shadow.setColor(QColor(0, 0, 0, 255))
+        self.setGraphicsEffect(self.shadow)
+
+        self.centralize()
+
+    def centralize(self):
+        self.adjustSize()
+        self.move(self.pos)
+
+    def setMessage(self, message):
+        self.label.setText(message)
+        self.centralize()
+
+    def addMessage(self, message):
+        self.setMessage(self.label.text() + "\n\n" + message)
+        
+    def __enter__(self):
+        # Show the dialog when entering the with block
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.show()
+        utils.wait(.01)
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Close the dialog when exiting the with block
+        utils.wait(self.hold)
+        self.close()
+
+
+
+class MyDelegate(QStyledItemDelegate):
     def __init__(self, Gallery):
         super(MyDelegate, self).__init__()
 
         self.Gallery = Gallery
 
         size = 25
-        self.iconSize = QtCore.QSize(size, size)
-        self.pad = QtCore.QPoint(int(size / 2), int(size / 2))
+        self.iconSize = QSize(size, size)
+        self.pad = QPoint(int(size / 2), int(size / 2))
 
-        self.badgeSize = QtCore.QSize(size, size)
+        self.badgeSize = QSize(size, size)
 
     def favIconRect(self, rect):
         size = rect.size()
-        rect.setSize(QtCore.QSize(self.iconSize.width(), self.iconSize.height()))
+        rect.setSize(QSize(self.iconSize.width(), self.iconSize.height()))
         rect.translate(size.width()-self.iconSize.width()-self.pad.x(), self.pad.y())
         return rect
 
     def favIconBoundsRect(self, rect):
         size = rect.size()
-        new = QtCore.QRect(rect)
+        new = QRect(rect)
         padx = self.pad.x() * 2
         pady = self.pad.y() * 2
-        new.setSize(QtCore.QSize(self.iconSize.width() + padx, self.iconSize.height() + pady))
+        new.setSize(QSize(self.iconSize.width() + padx, self.iconSize.height() + pady))
         new.translate(size.width() - self.iconSize.width() - padx, 0)
         return new
 
     def editorEvent(self, event, model, option, index):
-        if event.type() == QtCore.QEvent.MouseButtonRelease:
+        if event.type() == QEvent.MouseButtonRelease:
             if self.favIconBoundsRect(rectShrink(option.rect, 5, 5)).contains(event.pos()):
                 self.Gallery.toggledFavorite(index.row())
                 return True
@@ -106,26 +180,26 @@ class MyDelegate(QtWidgets.QStyledItemDelegate):
         return
 
     def paint(self, painter, option, index):
-        data = index.data(QtCore.Qt.UserRole)
+        data = index.data(Qt.UserRole)
         tags = data.get("tags", [])
         item = self.Gallery.ui.assetList.item(index.row())
 
-        mouseOver = option.state & QtWidgets.QStyle.State_MouseOver
+        mouseOver = option.state & QStyle.State_MouseOver
         selected = item.isSelected()
 
         # SHRINK RECT
         option.rect = rectShrink(option.rect, 5, 5)
 
-        bgPath = QtGui.QPainterPath()
+        bgPath = QPainterPath()
         bgPath.addRoundedRect(option.rect, 5, 5)
 
-        bgColor = QtGui.QColor("#252525")
-        bgColor2 = QtGui.QColor("#091A2D")
+        bgColor = QColor("#252525")
+        bgColor2 = QColor("#091A2D")
         galColor = hou.qt.toQColor(self.Gallery.color)
 
-        grad = QtGui.QLinearGradient(option.rect.topLeft(), option.rect.bottomLeft())
-        grad.setColorAt(0, QtGui.QColor(0, 0, 0, 0))
-        grad.setColorAt(1, QtGui.QColor(0, 0, 0, 100))
+        grad = QLinearGradient(option.rect.topLeft(), option.rect.bottomLeft())
+        grad.setColorAt(0, QColor(0, 0, 0, 0))
+        grad.setColorAt(1, QColor(0, 0, 0, 100))
 
         if selected:
             painter.fillPath(bgPath, bgColor2)
@@ -138,9 +212,9 @@ class MyDelegate(QtWidgets.QStyledItemDelegate):
             size = option.rect.size()
             size.setHeight(size.height() - 40)
 
-            pixmap = pixmap.scaled(size, QtCore.Qt.KeepAspectRatio)
+            pixmap = pixmap.scaled(size, Qt.KeepAspectRatio)
             pos = option.rect.topLeft()
-            pos += QtCore.QPoint((pixmap.width() - size.width())/-2, (pixmap.width() - pixmap.height())/2.0)
+            pos += QPoint((pixmap.width() - size.width())/-2, (pixmap.width() - pixmap.height())/2.0)
             painter.drawPixmap(pos, pixmap)
 
         # ============================================================
@@ -157,8 +231,8 @@ class MyDelegate(QtWidgets.QStyledItemDelegate):
                 maxSizePercentage = .2
                 sizey = (option.rect.size().height() - 40) * min(1.0/len(badgeList), maxSizePercentage)
                 pad = sizey / 4
-                badgeRect = QtCore.QRect(option.rect)
-                badgeRect.setSize(QtCore.QSize(sizey, sizey))
+                badgeRect = QRect(option.rect)
+                badgeRect.setSize(QSize(sizey, sizey))
                 badgeRect.translate(self.pad.x(), pad)
                 badgeRect.translate(pad, sizey * idx)
                 painter.drawPixmap(badgeRect, pixmap)
@@ -175,11 +249,11 @@ class MyDelegate(QtWidgets.QStyledItemDelegate):
         # Text
 
         font = hou.qt.mainWindow().font()
-        painter.setPen(QtGui.QColor("#ddd"))
+        painter.setPen(QColor("#ddd"))
         if mouseOver or selected:
             font.setBold(True)
         painter.setFont(font)
-        flags = QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter | QtCore.Qt.TextWordWrap
+        flags = Qt.AlignBottom | Qt.AlignHCenter | Qt.TextWordWrap
         painter.drawText(rectShrink(option.rect, 5, 5), flags, item.data(0))
 
         # ============================================================
@@ -207,13 +281,13 @@ class AssetListWidget(object):
         self.target.dropEvent = self.dropEvent
 
     def mouseMoveEvent(self, e):
-        super(QtWidgets.QListWidget, self.target).mouseMoveEvent(e)
+        super(QListWidget, self.target).mouseMoveEvent(e)
         if self.target._drag:
             self.droppedOut(e)
             self.target._drag = False
 
     def startDrag(self, actions):
-        super(QtWidgets.QListWidget, self.target).startDrag(actions)
+        super(QListWidget, self.target).startDrag(actions)
         self.target._drag = True
 
     def mimeTypes(self):
@@ -223,18 +297,18 @@ class AssetListWidget(object):
         self.droppedIn(e)
 
 
-class LoadItemThumbnail(QtCore.QRunnable):
+class LoadItemThumbnail(QRunnable):
     def __init__(self, item):
         self.item = item
         super(LoadItemThumbnail, self).__init__()
 
     def run(self):
         time.sleep(0.01)  # For some reason QPixmap hangs houdini if this line isn't present (?????)
-
+        
         if not self.item:
             return
         try:
-            thumbnail_path = self.item.data(QtCore.Qt.UserRole).get("thumbnail_path")
+            thumbnail_path = self.item.data(Qt.UserRole).get("thumbnail_path")
             if not thumbnail_path:
                 return
 
@@ -243,7 +317,7 @@ class LoadItemThumbnail(QtCore.QRunnable):
             if not thumbnail_path or not os.path.exists(thumbnail_path):
                 return
 
-            pixmap = QtGui.QPixmap(thumbnail_path).scaled(QtCore.QSize(512, 512), QtCore.Qt.KeepAspectRatio)
+            pixmap = QPixmap(thumbnail_path).scaled(QSize(512, 512), Qt.KeepAspectRatio)
             self.item.setData(ITEM_THUMBNAIL_PIXMAP_ROLE, pixmap)
 
         except Exception as e:
@@ -251,10 +325,10 @@ class LoadItemThumbnail(QtCore.QRunnable):
             traceback.print_exc()
             return
 
-class Gallery(QtWidgets.QWidget):
+class Gallery(QWidget):
     def __init__(self, parent=None, paneTab=None, **kwargs):
         super(Gallery, self).__init__(parent)
-        QtCore.qInstallMessageHandler(errHandler)
+        qInstallMessageHandler(errHandler)
 
         self.galleryName = kwargs.get("galleryName", "oli Gallery")
 
@@ -273,7 +347,7 @@ class Gallery(QtWidgets.QWidget):
         self.ui.setupUi(self)
 
         self.ui.assetList.setDragEnabled(True)
-        self.ui.assetList.setDragDropMode(QtWidgets.QAbstractItemView.DragDrop)
+        self.ui.assetList.setDragDropMode(QAbstractItemView.DragDrop)
 
         self.itemDelegate = MyDelegate(self)
         self.ui.assetList.setItemDelegate(self.itemDelegate)
@@ -287,14 +361,14 @@ class Gallery(QtWidgets.QWidget):
         self.color = hou.Color()
         self.applyStyles()
 
-        self.threadPool = QtCore.QThreadPool()
+        self.threadPool = QThreadPool()
 
-        self.defaultThumbIcon = QtGui.QIcon(iconsPath + "/default_thumbnail.png")
-        self.ui.toggleListView.setIcon(QtGui.QIcon(iconsPath + "/list_view.png"))
-        self.ui.toggleListView.setIconSize(QtCore.QSize(30, 30))
+        self.defaultThumbIcon = QIcon(iconsPath + "/default_thumbnail.png")
+        self.ui.toggleListView.setIcon(QIcon(iconsPath + "/list_view.png"))
+        self.ui.toggleListView.setIconSize(QSize(30, 30))
 
         self.ui.toggleFavorites.setIcon(hou.qt.Icon("BUTTONS_not_favorites", 30, 30))
-        self.ui.toggleFavorites.setIconSize(QtCore.QSize(30, 30))
+        self.ui.toggleFavorites.setIconSize(QSize(30, 30))
 
         self.preferencesFile = kwargs.get("preferencesFile", hou.getenv("HOUDINI_USER_PREF_DIR") + "/oli_gallery_prefs.json")
         self.defaultPreferencesFile = kwargs.get("defaultPreferencesFile", str(hou.getenv("OLI_ROOT")) + "/oli_gallery_prefs.json")
@@ -308,6 +382,28 @@ class Gallery(QtWidgets.QWidget):
             self.loadDefaultFolders(append=True)
 
         self.loadMessage()
+
+        return
+        # Timer for periodic refresh
+        self.periodicTimerDelay = 500
+        self.periodicTimer = QTimer(self)
+        self.periodicTimer.timeout.connect(self.periodicRefresh)
+        self.toggleTimer(True)
+
+    def toggleTimer(self, on):        
+        if on:
+            self.periodicTimer.start(self.periodicTimerDelay)
+        else:
+            self.periodicTimer.stop()
+
+    def close(self):
+        self.toggleTimer(False)
+
+        return super().close()
+
+    def periodicRefresh(self):
+        self.getModel().periodicRefresh()
+        self.filterItems()
 
     def validatePreferences(self):
 
@@ -386,6 +482,10 @@ class Gallery(QtWidgets.QWidget):
         :return:
         """
         warning = None
+
+        # if self doesn't have an attribute Model, create it
+        if not hasattr(self, "Model"):
+            self.Model = None
 
         if not modelName:
             for i in range(self.ui.foldersTable.rowCount()):
@@ -508,14 +608,14 @@ class Gallery(QtWidgets.QWidget):
         return msg.strip("<br>")
 
     def updateItemTooltip(self, item):
-        itemData = item.data(QtCore.Qt.UserRole)
+        itemData = item.data(Qt.UserRole)
         item.setToolTip(self.generateItemTooltip(itemData))
 
     def droppedOut(self, event):
         """
         Called when the user drags and drops an assetList item outside
 
-        :param event: QtCore.QEvent
+        :param event: QEvent
         :return: None
         """
         Model = self.getModel()
@@ -525,7 +625,7 @@ class Gallery(QtWidgets.QWidget):
         """
         Called when the user drops something into the assetList
 
-        :param event: QtCore.QEvent
+        :param event: QEvent
         :return:
         """
         Model = self.getModel()
@@ -537,18 +637,18 @@ class Gallery(QtWidgets.QWidget):
         """
 
         # ContextMenu
-        if event.type() == QtCore.QEvent.ContextMenu:
+        if event.type() == QEvent.ContextMenu:
             if source is self.ui.assetList:
                 itemList = self.ui.assetList.selectedItems()
                 return self.getModel().assetListContextMenu(event, itemList)
 
-        elif event.type() == QtCore.QEvent.KeyPress:
+        elif event.type() == QEvent.KeyPress:
             text = event.text().strip()
             # if text:
-            #     self.ui.searchBar.setFocus(QtCore.Qt.ShortcutFocusReason)
+            #     self.ui.searchBar.setFocus(Qt.ShortcutFocusReason)
             #     self.ui.searchBar.setText(self.ui.searchBar.text() + text)
 
-        # elif event.type() == QtCore.QEvent.Paint:
+        # elif event.type() == QEvent.Paint:
         #     print(event)
         #     return True
 
@@ -575,7 +675,7 @@ class Gallery(QtWidgets.QWidget):
             # Submenu: Change model to
             menu_model = menu.addMenu("Change model to")
             for model in self.getModelsData():
-                action_model = QtWidgets.QAction(model, self)
+                action_model = QAction(model, self)
                 action_model.setProperty("action", "change_model")
                 action_model.setProperty("model", model)
                 menu_model.addAction(action_model)
@@ -584,13 +684,13 @@ class Gallery(QtWidgets.QWidget):
             menu.addSeparator()
 
             # Menu Item: Remove
-            action_remove = QtWidgets.QAction("Remove", self)
+            action_remove = QAction("Remove", self)
             action_remove.setProperty("action", "remove")
             menu.addAction(action_remove)
 
         else:
             # Menu Item: Add Item
-            action_add_item = QtWidgets.QAction("Add Item", self)
+            action_add_item = QAction("Add Item", self)
             action_add_item.setProperty("action", "add_item")
             font = action_add_item.font()
             font.setBold(True)
@@ -598,7 +698,7 @@ class Gallery(QtWidgets.QWidget):
             menu.addAction(action_add_item)
 
             # Menu Item: Open Preferences File
-            action_open_prefs_file = QtWidgets.QAction("Open Preferences File", self)
+            action_open_prefs_file = QAction("Open Preferences File", self)
             action_open_prefs_file.setProperty("action", "open_prefs_file")
             menu.addAction(action_open_prefs_file)
 
@@ -606,7 +706,7 @@ class Gallery(QtWidgets.QWidget):
             menu.addSeparator()
 
             # Menu Item: Reset to Defaults
-            action_reset_to_defaults = QtWidgets.QAction("Reset to Defaults", self)
+            action_reset_to_defaults = QAction("Reset to Defaults", self)
             action_reset_to_defaults.setProperty("action", "reset_to_defaults")
             menu.addAction(action_reset_to_defaults)
 
@@ -617,7 +717,7 @@ class Gallery(QtWidgets.QWidget):
                 rows.append(row)
 
         # Open Menu
-        menu_exec = menu.exec_(QtGui.QCursor.pos())
+        menu_exec = menu.exec_(QCursor.pos())
         if not menu_exec:
             return False
 
@@ -648,7 +748,7 @@ class Gallery(QtWidgets.QWidget):
                 item = self.ui.foldersTable.item(row, 1)
                 if not item:
                     self.ui.foldersTable.blockSignals(True)
-                    item = self.ui.foldersTable.setItem(row, 2, QtWidgets.QTableWidgetItem(""))
+                    item = self.ui.foldersTable.setItem(row, 2, QTableWidgetItem(""))
                     self.ui.foldersTable.blockSignals(False)
                     item = self.ui.foldersTable.item(row, 1)
 
@@ -671,8 +771,8 @@ class Gallery(QtWidgets.QWidget):
         row = self.ui.foldersTable.rowCount()
 
         self.ui.foldersTable.insertRow(row)
-        self.ui.foldersTable.setItem(row, 0, QtWidgets.QTableWidgetItem(root))
-        self.ui.foldersTable.setItem(row, 1, QtWidgets.QTableWidgetItem(model))
+        self.ui.foldersTable.setItem(row, 0, QTableWidgetItem(root))
+        self.ui.foldersTable.setItem(row, 1, QTableWidgetItem(model))
 
         self.ui.foldersTable.blockSignals(False)
 
@@ -687,7 +787,7 @@ class Gallery(QtWidgets.QWidget):
         self.ui.rootBox.clear()
         self.ui.rootBox.blockSignals(True)
 
-        self.ui.rootBox.setIconSize(QtCore.QSize(30, 30))
+        self.ui.rootBox.setIconSize(QSize(30, 30))
 
         for row in range(self.ui.foldersTable.rowCount()):
             root = self.ui.foldersTable.item(row, 0).text()
@@ -697,7 +797,7 @@ class Gallery(QtWidgets.QWidget):
             # Add Model Icon
             modelIconPath = self.getModelIconFromRoot(root)
             if os.path.exists(modelIconPath):
-                self.ui.rootBox.setItemIcon(self.ui.rootBox.count()-1, QtGui.QIcon(modelIconPath))
+                self.ui.rootBox.setItemIcon(self.ui.rootBox.count()-1, QIcon(modelIconPath))
 
             # Add Colors to the rooBox
             with open(self.preferencesFile, "r") as f:
@@ -707,7 +807,7 @@ class Gallery(QtWidgets.QWidget):
                     pass
             try:
                 rgb = data["folders"][root]["config"]["color"]
-                self.ui.rootBox.setItemData(row, QtGui.QColor(rgb[0], rgb[1], rgb[2]), QtCore.Qt.ForegroundRole)
+                self.ui.rootBox.setItemData(row, QColor(rgb[0], rgb[1], rgb[2]), Qt.ForegroundRole)
             except KeyError:
                 pass
         
@@ -777,6 +877,8 @@ class Gallery(QtWidgets.QWidget):
             item = self.ui.assetList.item(row)
             Model.filterItem(item, text)
 
+        self.ui.assetList.sortItems()
+
     def createItems(self):
         """
         Creates each item inside of the assetList from scratch.
@@ -828,7 +930,7 @@ class Gallery(QtWidgets.QWidget):
         #     if ListMode:
         #         font.setPixelSize(20)
         #         font.setBold(True)
-        #     font_h = QtGui.QFontMetricsF(font).height()
+        #     font_h = QFontMetricsF(font).height()
 
         # # ========================
         # #        SNAP
@@ -837,11 +939,11 @@ class Gallery(QtWidgets.QWidget):
         # val = listWidth / targetItemCount
 
         if ListMode:
-            self.ui.assetList.setIconSize(QtCore.QSize(font_h, font_h))
-            self.ui.assetList.setGridSize(QtCore.QSize(0, font_h*2))
+            self.ui.assetList.setIconSize(QSize(font_h, font_h))
+            self.ui.assetList.setGridSize(QSize(0, font_h*2))
         else:
-            self.ui.assetList.setIconSize(QtCore.QSize(val, val))
-            self.ui.assetList.setGridSize(QtCore.QSize(val, val+font_h))
+            self.ui.assetList.setIconSize(QSize(val, val))
+            self.ui.assetList.setGridSize(QSize(val, val+font_h))
 
     def toggleListView(self, ListMode):
         """
@@ -854,13 +956,13 @@ class Gallery(QtWidgets.QWidget):
 
         if ListMode:
             self.ui.toggleListView.setChecked(True)
-            self.ui.assetList.setViewMode(QtWidgets.QListView.ListMode)
+            self.ui.assetList.setViewMode(QListView.ListMode)
             self.thumbnailResize(0, ListMode=True)
             self.ui.thumbnailSizeSlider.setEnabled(False)
         else:
             self.ui.toggleListView.setChecked(False)
             self.ui.assetList.setProperty("viewMode", "IconMode")
-            self.ui.assetList.setViewMode(QtWidgets.QListView.IconMode)
+            self.ui.assetList.setViewMode(QListView.IconMode)
             self.thumbnailResize(self.ui.thumbnailSizeSlider.value())
             self.ui.thumbnailSizeSlider.setEnabled(True)
 
@@ -896,14 +998,14 @@ class Gallery(QtWidgets.QWidget):
     def import_selected_assets_to_ol_instancer(self, node):
         reload(lookdev)
         for item in self.ui.assetList.selectedItems():
-            itemData = item.data(QtCore.Qt.UserRole)
+            itemData = item.data(Qt.UserRole)
             filepath = self.collectionPath + "/" + itemData["asset_name"]
 
             lookdev.add_to_ol_instancer(node, filepath)
 
     def import_selected_assets_to_lop_layout(self):
         for item in self.ui.assetList.selectedItems():
-            itemData = item.data(QtCore.Qt.UserRole)
+            itemData = item.data(Qt.UserRole)
             filepath = self.collectionPath + "/" + itemData["asset_name"]
 
             reload(lookdev)
@@ -936,7 +1038,7 @@ class Gallery(QtWidgets.QWidget):
 
         # self.ui.assetList.setUniformItemSizes(True)
 
-        self.ui.foldersTable.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch);
+        self.ui.foldersTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch);
 
         self.setStyleSheet("""
             Gallery {{
@@ -1132,7 +1234,7 @@ class Gallery(QtWidgets.QWidget):
             data["last_root"] = root
 
         data["thumbnail_size"] = self.ui.thumbnailSizeSlider.value()
-        data["list_mode"] = self.ui.assetList.viewMode() == QtWidgets.QListView.ListMode
+        data["list_mode"] = self.ui.assetList.viewMode() == QListView.ListMode
 
         data["folders"] = {}
         for i in range(self.ui.foldersTable.rowCount()):
@@ -1285,10 +1387,10 @@ class Gallery(QtWidgets.QWidget):
 
                 row = self.ui.foldersTable.rowCount()
                 self.ui.foldersTable.insertRow(row)
-                self.ui.foldersTable.setItem(row, 0, QtWidgets.QTableWidgetItem(root))
+                self.ui.foldersTable.setItem(row, 0, QTableWidgetItem(root))
 
                 if "model" in data["folders"][root]:
-                    self.ui.foldersTable.setItem(row, 1, QtWidgets.QTableWidgetItem(data["folders"][root]["model"]))
+                    self.ui.foldersTable.setItem(row, 1, QTableWidgetItem(data["folders"][root]["model"]))
                 if "config" in data["folders"][root]:
                     config = data["folders"][root]["config"]
                     if not isinstance(config, dict):
@@ -1296,7 +1398,7 @@ class Gallery(QtWidgets.QWidget):
                             config = json.loads(str(config))
                         except ValueError:
                             config = {}
-                    self.ui.foldersTable.setItem(row, 2, QtWidgets.QTableWidgetItem(json.dumps(config, indent=4, sort_keys=True)))
+                    self.ui.foldersTable.setItem(row, 2, QTableWidgetItem(json.dumps(config, indent=4, sort_keys=True)))
 
         self.ui.foldersTable.blockSignals(False)
 
@@ -1435,7 +1537,7 @@ class Gallery(QtWidgets.QWidget):
         # =========================
         # Update current session's Item Data
 
-        itemData = item.data(QtCore.Qt.UserRole)
+        itemData = item.data(Qt.UserRole)
         tags = itemData.get("tags", [])
 
         if on:
@@ -1444,7 +1546,7 @@ class Gallery(QtWidgets.QWidget):
             tags.remove(tagName)
 
         itemData["tags"] = tags
-        item.setData(QtCore.Qt.UserRole, itemData)
+        item.setData(Qt.UserRole, itemData)
         self.updateItemTooltip(item)
 
         # =========================

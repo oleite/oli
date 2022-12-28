@@ -63,6 +63,9 @@ class MegascansModel(DefaultModel.DefaultModel):
 
         self.Gallery.ui.leftNavWidget.layout().addWidget(self.rendererWidget)
 
+    def __del__(self):
+        self.rendererWidget.deleteLater()
+
     def rendererChanged(self, val):
         self.Gallery.updateCurModelConfig({
             "renderer": val,
@@ -194,7 +197,7 @@ class MegascansModel(DefaultModel.DefaultModel):
             d = d[cat]
         category = "/".join(categoryList)
 
-        self.createNavHierarchy(category)
+        # self.createNavHierarchy(category)
 
         itemData.update({
             "ms_json_path": ms_json_path,
@@ -215,12 +218,19 @@ class MegascansModel(DefaultModel.DefaultModel):
 
         return item
 
-    def importAsset(self, item):
+    def importAsset(self, item, showUI=True):
         if not self.valid:
             return
 
         itemData = item.data(QtCore.Qt.UserRole)
-        return self.importAssetFromData(itemData)
+
+        if showUI:
+            with gallery.Dialog("Importing {}...".format(itemData.get("asset_display_name", ""))) as dialog:
+                node = self.importAssetFromData(itemData)
+        else:
+            node = self.importAssetFromData(itemData)
+
+        return node
 
     def importAssetFromData(self, itemData):
         assetDir = utils.join(self.Gallery.collectionPath, itemData["asset_name"])
@@ -406,3 +416,6 @@ class MegascansModel(DefaultModel.DefaultModel):
         
         lookdev.buildMaterialOfRenderer(renderer, textures, name, matnet)
         matnet.layoutChildren()
+
+    def periodicRefresh(self):
+        self.updateNavHierarchy()

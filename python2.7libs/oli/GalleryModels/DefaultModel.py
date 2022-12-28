@@ -3,11 +3,31 @@
 import os
 import hou
 import toolutils
-from PySide2 import QtWidgets, QtCore, QtGui
 import pyperclip
+
+from PySide2.QtCore import *
+from PySide2.QtGui import *
+from PySide2.QtWidgets import *
 
 from oli import utils
 from oli import gallery
+
+
+class ItemCreator(QRunnable, QObject):
+    def __init__(self, assetName, model):
+        super(ItemCreator, self).__init__()
+
+        self.assetName = assetName
+        self.model = model
+
+    def run(self):
+        item = self.model.createItem(self.assetName)
+        if not item:
+            return
+
+        self.model.Gallery.threadPool.start(self.model.Gallery.LoadItemThumbnail(item))
+
+        item.setData(gallery.ITEM_BADGES_LIST_ROLE, self.model.itemBadges(item))
 
 
 class DefaultModel(object):
@@ -17,21 +37,23 @@ class DefaultModel(object):
         self.Gallery.setMessage("")
         self.valid = True
 
+        self.prevItemCount = 0
+
     def assetListContextMenuNoItems(self, event):
         menu = hou.qt.Menu()
 
         # Menu Item: Open in explorer
-        action_open_in_explorer = QtWidgets.QAction("Open in Explorer", self.Gallery)
+        action_open_in_explorer = QAction("Open in Explorer", self.Gallery)
         action_open_in_explorer.setProperty("action", "action_open_in_explorer")
         menu.addAction(action_open_in_explorer)
 
         # Menu Item: Create Collection
-        action_create_collection = QtWidgets.QAction("Create Collection", self.Gallery)
+        action_create_collection = QAction("Create Collection", self.Gallery)
         action_create_collection.setProperty("action", "action_create_collection")
         menu.addAction(action_create_collection)
 
         # Menu Item: Refresh
-        action_refresh = QtWidgets.QAction("Refresh", self.Gallery)
+        action_refresh = QAction("Refresh", self.Gallery)
         action_refresh.setProperty("action", "action_refresh")
         menu.addAction(action_refresh)
 
@@ -64,7 +86,7 @@ class DefaultModel(object):
         menu = hou.qt.Menu()
 
         # Menu Item: import_all
-        action_import_all = QtWidgets.QAction("Import", self.Gallery)
+        action_import_all = QAction("Import", self.Gallery)
         action_import_all.setProperty("action", "import_all")
         font = action_import_all.font()
         font.setBold(True)
@@ -76,7 +98,7 @@ class DefaultModel(object):
 
         # Only show if single item selected
         if len(itemList) == 1:
-            itemData = itemList[0].data(QtCore.Qt.UserRole)
+            itemData = itemList[0].data(Qt.UserRole)
 
             # Menu Item: "Copy" submenu
             submenu_copy = menu.addMenu("Copy")
@@ -85,12 +107,12 @@ class DefaultModel(object):
                     continue
                 keyname = key.replace("_", " ")
                 keyname = keyname[0].upper() + keyname[1:]
-                new_action = QtWidgets.QAction(keyname, self.Gallery)
+                new_action = QAction(keyname, self.Gallery)
                 new_action.setProperty("action", "COPY_" + key)
                 submenu_copy.addAction(new_action)
 
             # Menu Item: Open in explorer
-            action_open_in_explorer = QtWidgets.QAction("Open Asset in Explorer", self.Gallery)
+            action_open_in_explorer = QAction("Open Asset in Explorer", self.Gallery)
             action_open_in_explorer.setProperty("action", "action_open_in_explorer")
             menu.addAction(action_open_in_explorer)
 
@@ -109,7 +131,7 @@ class DefaultModel(object):
                 node = self.importAsset(item)
 
         for item in itemList:
-            itemData = item.data(QtCore.Qt.UserRole)
+            itemData = item.data(Qt.UserRole)
 
             # if action == "import_all":
             #     self.Gallery.import_asset(item)
@@ -126,7 +148,7 @@ class DefaultModel(object):
         return True
 
     def filterItem(self, item, text=None):
-        itemData = item.data(QtCore.Qt.UserRole)
+        itemData = item.data(Qt.UserRole)
 
         item.setHidden(False)
 
@@ -160,16 +182,16 @@ class DefaultModel(object):
         items = []
 
         for asset_name in sorted(assets):
-            item = self.createItem(asset_name)
-            if not item:
-                continue
-            items.append(item)
-            self.Gallery.threadPool.start(self.Gallery.LoadItemThumbnail(item))
+            creator = ItemCreator(asset_name, self)
+            
+            # filterItems when creator emits itemCreated
+            # creator.itemCreated.connect(self.itemCreated)
 
-            item.setData(gallery.ITEM_BADGES_LIST_ROLE, self.itemBadges(item))
+            self.Gallery.threadPool.start(creator)
 
-        self.Gallery.filterItems()
-        return items
+    def itemCreated(self, item):
+        print("itemCreated :  " + item.data(0))
+        # self.Gallery.filterItems()
 
     def createItem(self, asset_name):
         _id = "{}/{}".format(self.Gallery.ui.collectionsBox.currentText(), itemData["asset_name"])
@@ -181,8 +203,8 @@ class DefaultModel(object):
             "tags": self.Gallery.getTagsFromId(_id),
         }
 
-        item = QtWidgets.QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_display_name"])
-        item.setData(QtCore.Qt.UserRole, itemData)
+        item = QListWidgetItem(self.Gallery.defaultThumbIcon, itemData["asset_display_name"])
+        item.setData(Qt.UserRole, itemData)
         item.setData(gallery.ITEM_ID_ROLE, _id)
 
         self.Gallery.updateItemTooltip(item)
@@ -199,7 +221,7 @@ class DefaultModel(object):
         selection = hou.selectedNodes()
         scene_viewer = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
 
-        itemData = item.data(QtCore.Qt.UserRole)
+        itemData = item.data(Qt.UserRole)
         collection = self.Gallery.ui.collectionsBox.currentText()
 
         n_sublayer = None
@@ -319,11 +341,30 @@ class DefaultModel(object):
 
     def refresh(self):
         self.Gallery.loadState()
+        self.updateNavHierarchy()
 
     def treeNavItemChanged(self, item, oldItem):
         self.Gallery.filterItems()
 
+    def updateNavHierarchy(self):
+        itemCount = self.Gallery.ui.assetList.count()
+
+        if itemCount != self.prevItemCount:
+            self.prevItemCount = itemCount
+
+            self.Gallery.ui.treeNav.clear()
+            for row in range(itemCount):
+                item = self.Gallery.ui.assetList.item(row)
+
+                self.createNavHierarchy(item.data(Qt.UserRole).get("category", ""))
+
     def createNavHierarchy(self, category):
+        """
+        Create the navigation hierarchy based on the category of the asset.
+        """
+
+        self.Gallery.ui.leftNavWidget.setVisible(True)
+        
         tree = self.Gallery.ui.treeNav
         splitCategory = category.strip("/").split("/")
 
@@ -332,11 +373,11 @@ class DefaultModel(object):
         if topCat in childrenValues:
             item = tree.topLevelItem(childrenValues.index(topCat))
 
-            font = QtGui.QFont("", -1, QtGui.QFont.Bold)
+            font = QFont("", -1, QFont.Bold)
             font.setUnderline(True)
             item.setFont(0, font)
         else:
-            item = QtWidgets.QTreeWidgetItem(tree, [topCat, ])
+            item = QTreeWidgetItem(tree, [topCat, ])
 
         item.setExpanded(True)
 
@@ -347,8 +388,10 @@ class DefaultModel(object):
                 if item:
                     child = item.child(childrenValues.index(subCat))
             else:
-                child = QtWidgets.QTreeWidgetItem(item, [subCat, ])
+                child = QTreeWidgetItem(item, [subCat, ])
             item = child
+
+        return item
 
     @staticmethod
     def getObjNet():
@@ -361,3 +404,6 @@ class DefaultModel(object):
         else:
             obj = hou.node("/obj")
         return obj
+
+    def periodicRefresh(self):
+        return
