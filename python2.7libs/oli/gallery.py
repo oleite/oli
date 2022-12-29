@@ -78,7 +78,7 @@ def errHandler(msg_type, msg_log_context, msg_string):
 
 
 class Dialog(QDialog):
-    def __init__(self, message, title="Houdini", hold=0.1, pos=None):
+    def __init__(self, message, title="Houdini", hold=0.1, pos=None, frameless=True, centralized=False):
         self.parent = hou.qt.mainWindow()
         super(Dialog, self).__init__(self.parent)
         
@@ -86,10 +86,15 @@ class Dialog(QDialog):
         if pos:
             self.pos = pos
         else:
-            pos = QCursor.pos()
+            self.pos = QCursor.pos()
         
         self.setWindowTitle(title)
         self.setMinimumSize(250, 100)
+
+        if frameless:
+            self.setWindowFlags(Qt.FramelessWindowHint)
+
+        self.centralized = centralized
         
         # add message to the dialog
         self.label = QLabel(message)
@@ -119,7 +124,11 @@ class Dialog(QDialog):
 
     def centralize(self):
         self.adjustSize()
-        self.move(self.pos)
+
+        if self.centralized:
+            self.move(self.pos - QPoint(self.width() / 2, self.height() / 2))
+        else:
+            self.move(self.pos)
 
     def setMessage(self, message):
         self.label.setText(message)
@@ -130,7 +139,6 @@ class Dialog(QDialog):
         
     def __enter__(self):
         # Show the dialog when entering the with block
-        self.setWindowFlags(Qt.FramelessWindowHint)
         self.show()
         utils.wait(.01)
         return self
