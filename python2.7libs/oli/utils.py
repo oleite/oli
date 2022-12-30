@@ -84,7 +84,6 @@ def flashMessage(message, duration):
     toolutils.sceneViewer().flashMessage("", message, duration)
     toolutils.networkEditor().flashMessage("", message, duration)
 
-
 def cameraFrameGeometry(nodeOrGeometry, camera=None):
     """
     Frames the camera to the geometry.

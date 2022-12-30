@@ -75,11 +75,25 @@ def errHandler(msg_type, msg_log_context, msg_string):
 # self.dialog.move(QCursor.pos())
 
 
+class SignalEmitter(QObject):
+    finished = Signal()
+    error = Signal(str)
+    progress = Signal(int)
+    message = Signal(str)
+    custom1 = Signal(object)
+    custom2 = Signal(object)
+    custom3 = Signal(object)
+    custom4 = Signal(object)
+    custom5 = Signal(object)
 
 
 class Dialog(QDialog):
-    def __init__(self, message, title="Houdini", hold=0.1, pos=None, frameless=True, centralized=False):
-        self.parent = hou.qt.mainWindow()
+    def __init__(self, message, parent=None, title="Houdini", hold=0.1, pos=None, frameless=True, centralized=True):
+        if parent:
+            self.parent = parent
+        else:
+            self.parent = hou.qt.mainWindow()
+
         super(Dialog, self).__init__(self.parent)
         
         self.hold = hold
@@ -110,14 +124,18 @@ class Dialog(QDialog):
         layout.addWidget(self.label)
         self.setLayout(layout)
 
-        # Add red border to left side of dialog
-        self.setStyleSheet("QDialog {border-left: 5px solid orange;}")
+        self.setStyleSheet("""
+            QDialog {
+                border-left: 5px solid cyan;
+                border-radius: 5px;
+            }
+        """)
 
         # Add a drop shadow to the dialog
         self.shadow = QGraphicsDropShadowEffect(self)
         self.shadow.setBlurRadius(100)
-        self.shadow.setOffset(30)
-        self.shadow.setColor(QColor(0, 0, 0, 255))
+        self.shadow.setOffset(10, 30)
+        self.shadow.setColor(QColor(0, 10, 10, 150))
         self.setGraphicsEffect(self.shadow)
 
         self.centralize()
@@ -136,7 +154,7 @@ class Dialog(QDialog):
 
     def addMessage(self, message):
         self.setMessage(self.label.text() + "\n\n" + message)
-        
+
     def __enter__(self):
         # Show the dialog when entering the with block
         self.show()
@@ -1479,6 +1497,10 @@ class Gallery(QWidget):
             utils.wait(duration)
             self.setMessage("")
         hou.ui.postEventCallback(run)
+
+    def setErrorMessage(self, message):
+        self.Gallery.setMessage('<span class="error">' + message + '</span>')
+        return True
 
     def loadMessage(self, preferencesFile=None):
         """

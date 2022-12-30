@@ -31,11 +31,12 @@ class ItemCreator(QRunnable, QObject):
 
 
 class DefaultModel(object):
-    def __init__(self, asset_gallery):
+    def __init__(self, asset_gallery, verbose=False):
         self.Gallery = asset_gallery
         self.Gallery.paneTab.setShowNetworkControls(False)
         self.Gallery.setMessage("")
         self.valid = True
+        self.verbose = verbose
 
         self.prevItemCount = 0
 
