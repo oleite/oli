@@ -84,6 +84,49 @@ def flashMessage(message, duration):
     toolutils.sceneViewer().flashMessage("", message, duration)
     toolutils.networkEditor().flashMessage("", message, duration)
 
+
+def getGeometry(node):
+    _type = type(node)
+    if _type == hou.ObjNode and node.displayNode():
+        geometry = node.displayNode().geometry()
+    elif _type == hou.SopNode:
+        geometry = node.geometry()
+    elif _type == hou.Geometry:
+        geometry = node
+    else:
+        return None
+    return geometry
+    
+
+def getGeometryGlobal(node, mirror=True):
+    _type = type(node)
+    if _type == hou.ObjNode:
+        sop = node.displayNode()
+    elif _type == hou.SopNode:
+        sop = node
+    else:
+        return None
+    
+    if not sop:
+        return None
+
+    temp = hou.node("/obj").createNode("geo", "temp")
+    objMerge = temp.createNode("object_merge")
+    objMerge.setParms({
+        "objpath1": sop.path(),
+        "xformtype": 1
+    })
+    out = objMerge
+    if mirror:
+        mirror = objMerge.createOutputNode("mirror")
+        out = mirror
+
+    geometry = hou.Geometry()
+    geometry.copy(out.geometry())
+    temp.destroy()
+    return geometry
+
+
 def cameraFrameGeometry(nodeOrGeometry, camera=None):
     """
     Frames the camera to the geometry.
@@ -92,15 +135,11 @@ def cameraFrameGeometry(nodeOrGeometry, camera=None):
     :param camera: Optional camera to be set as current.
     :return: hou.GeometryViewportCamera
     """
-    _type = type(nodeOrGeometry)
-    if _type == hou.ObjNode:
-        geometry = nodeOrGeometry.displayNode().geometry()
-    elif _type == hou.SopNode:
-        geometry = nodeOrGeometry.geometry()
-    elif _type == hou.Geometry:
-        geometry = nodeOrGeometry
-    else:
-        return None
+    geometry = getGeometryGlobal(nodeOrGeometry)
+    if not geometry:
+        geometry = getGeometry(nodeOrGeometry)
+        if not geometry:
+            return None
 
     viewport = toolutils.sceneViewer().curViewport()
     if camera:
@@ -191,7 +230,7 @@ def makeSafe(text):
     return text
 
 
-def selectAnyFromTree(path_list, exclusive=True):
+def selectAnyFromTree(path_list, picked=(), exclusive=True, message=None, title=None, clear_on_cancel=True, width=0, height=0):
     """
     Extends hou.ui.selectFromTree()
     Converts ["/character/pig/hat",] to ["/character","/character/pig","/character/pig/hat"]
@@ -209,7 +248,7 @@ def selectAnyFromTree(path_list, exclusive=True):
             choices.append("/".join(plist))
 
     choices = list(dict.fromkeys(choices))  # Remove duplicates
-    return hou.ui.selectFromTree(choices, exclusive=exclusive)
+    return hou.ui.selectFromTree(choices, picked, exclusive, message, title, clear_on_cancel, width, height)
 
 
 def clamp(val, val_min, val_max):
@@ -283,3 +322,16 @@ def treeItemToFullPath(item, column=0):
         path = item.parent().text(column) + "/" + path
         item = item.parent()
     return path
+
+
+def storeNodePos(node):
+    pos = node.position()
+    node.setUserData("posx", str(pos.x()))
+    node.setUserData("posy", str(pos.y()))
+
+
+def loadNodePos(node):
+    posx = node.userData("posx")
+    posy = node.userData("posy")
+    if posx and posy:
+        node.setPosition((float(posx), float(posy)))

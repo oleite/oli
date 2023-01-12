@@ -199,13 +199,13 @@ def buildMaterialOfRenderer(renderer, textures, name, matnet=None):
         except ImportError:
             raise hou.Error("VRay is not installed")
 
-        buildVRayMaterial(textures, name, matnet)
+        return buildVRayMaterial(textures, name, matnet)
     elif renderer == "MaterialX":
         if hou.applicationVersion() < (19, 0, 0):
             hou.ui.displayMessage('MaterialX is only supported in Houdini 19 or greater.')
             return
 
-        buildMaterialXMaterial(textures, name, matnet)
+        return buildMaterialXMaterial(textures, name, matnet)
     else:
         hou.ui.displayMessage('"{}" materials not supported.'.format(renderer))
         return

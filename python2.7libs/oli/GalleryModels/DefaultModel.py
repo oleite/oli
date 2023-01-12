@@ -14,11 +14,12 @@ from oli import gallery
 
 
 class ItemCreator(QRunnable, QObject):
-    def __init__(self, assetName, model):
+    def __init__(self, assetName, model, emitter=None):
         super(ItemCreator, self).__init__()
 
         self.assetName = assetName
         self.model = model
+        self.emitter = emitter
 
     def run(self):
         item = self.model.createItem(self.assetName)
@@ -29,6 +30,8 @@ class ItemCreator(QRunnable, QObject):
 
         item.setData(gallery.ITEM_BADGES_LIST_ROLE, self.model.itemBadges(item))
 
+        if self.emitter:
+            self.emitter.itemCreated.emit(item)
 
 class DefaultModel(object):
     def __init__(self, asset_gallery, verbose=False):
@@ -183,16 +186,22 @@ class DefaultModel(object):
         items = []
 
         for asset_name in sorted(assets):
-            creator = ItemCreator(asset_name, self)
-            
-            # filterItems when creator emits itemCreated
-            # creator.itemCreated.connect(self.itemCreated)
+            emitter = gallery.SignalEmitter()        
+            creator = ItemCreator(asset_name, self, emitter)
+
+            emitter.itemCreated.connect(self.itemCreated)
 
             self.Gallery.threadPool.start(creator)
 
     def itemCreated(self, item):
-        print("itemCreated :  " + item.data(0))
-        # self.Gallery.filterItems()
+        if self.verbose:
+            print("itemCreated :  " + item.data(0))
+        self.Gallery.filterItems()
+
+        category = item.data(Qt.UserRole).get("category", "")
+
+        if category:
+            self.createNavHierarchy(category)
 
     def createItem(self, asset_name):
         _id = "{}/{}".format(self.Gallery.ui.collectionsBox.currentText(), itemData["asset_name"])
@@ -342,7 +351,7 @@ class DefaultModel(object):
 
     def refresh(self):
         self.Gallery.loadState()
-        self.updateNavHierarchy()
+        # self.updateNavHierarchy()
 
     def treeNavItemChanged(self, item, oldItem):
         self.Gallery.filterItems()

@@ -414,8 +414,11 @@ class MegascansModel(DefaultModel.DefaultModel):
     def buildMaterial(self, textures, name, matnet=None):
         renderer = self.rendererComboBox.currentText()
         
-        lookdev.buildMaterialOfRenderer(renderer, textures, name, matnet)
-        matnet.layoutChildren()
+        material = lookdev.buildMaterialOfRenderer(renderer, textures, name, matnet)
+        if matnet:
+            matnet.layoutChildren()
+
+        return material
 
     def periodicRefresh(self):
         self.updateNavHierarchy()

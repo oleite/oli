@@ -80,6 +80,7 @@ class SignalEmitter(QObject):
     error = Signal(str)
     progress = Signal(int)
     message = Signal(str)
+    itemCreated = Signal(object)
     custom1 = Signal(object)
     custom2 = Signal(object)
     custom3 = Signal(object)
@@ -1528,12 +1529,11 @@ class Gallery(QWidget):
         for row in range(self.ui.foldersTable.rowCount()):
             if self.ui.foldersTable.item(row, 0).text() == root:
                 config_item = self.ui.foldersTable.item(row, 2)
-                text = config_item.text()
-                if text:
-                    data = json.loads(text)
-                else:
-                    data = {}
-                return data
+                if config_item:
+                    text = config_item.text()
+                    if text:
+                        return json.loads(text)                
+                return {}
 
     def setCurModelConfig(self, data):
         """
