@@ -335,3 +335,18 @@ def loadNodePos(node):
     posy = node.userData("posy")
     if posx and posy:
         node.setPosition((float(posx), float(posy)))
+
+
+def scaleWindow(windowSize, scaleFactor):
+    """
+    Scales a window to a given scale factor.
+    
+    :param windowSize: The size of the window to scale (width, height)
+    :param scaleFactor: The scale factor to apply
+    """
+
+    width, height = windowSize
+    scaledWidth = int(width * scaleFactor)
+    scaledHeight = int(height * scaleFactor)
+    position = ((width - scaledWidth) // 2, (height - scaledHeight) // 2)
+    return position, (scaledWidth, scaledHeight)

@@ -20,6 +20,7 @@ from . import galleryUi
 from . import lookdev
 from . import utils
 
+reload(utils)
 
 iconsPath = hou.getenv("OLI_ICONS")
 
@@ -53,8 +54,25 @@ def openGallery(attemptSplit=True, **kwargs):
             tab.setLabel(galleryName)
             return tab
 
-    panel = desktop.createFloatingPanel(hou.paneTabType.PythonPanel, python_panel_interface=interface)
+    windowSize = hou.qt.mainWindow().size().toTuple()
+    scaleFactor = 0.6
+    position, scaledWindowSize = utils.scaleWindow(windowSize, scaleFactor)
+
+    panel = desktop.createFloatingPanel(
+        pane_tab_type=hou.paneTabType.PythonPanel,
+        python_panel_interface=interface,
+        position=position,
+        size=scaledWindowSize
+    )
     panel.setName(galleryName)
+
+    for pane in panel.panes():
+        pane.setShowPaneTabs(False)
+        try:
+            pane.showPaneTabsStow(False)
+        except:
+            pass
+
     return panel
 
 
@@ -403,12 +421,17 @@ class Gallery(QWidget):
         if not self.validatePreferences():
             return
 
-        # If force default folders
         if kwargs.get("forceDefaultFolders"):
+            self.loadDefaultFolders(append=False)
+        elif kwargs.get("appendDefaultFolders"):
             self.loadStateFolders()
             self.loadDefaultFolders(append=True)
 
         self.loadMessage()
+
+        if not self.debug:
+            self.ui.toggleListView.hide()
+            self.ui.applyTag.hide()
 
         return
         # Timer for periodic refresh
@@ -1500,7 +1523,7 @@ class Gallery(QWidget):
         hou.ui.postEventCallback(run)
 
     def setErrorMessage(self, message):
-        self.Gallery.setMessage('<span class="error">' + message + '</span>')
+        self.setMessage('<span class="error">' + message + '</span>')
         return True
 
     def loadMessage(self, preferencesFile=None):
