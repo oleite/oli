@@ -66,6 +66,9 @@ class MegascansModel(DefaultModel.DefaultModel):
     def __del__(self):
         self.rendererWidget.deleteLater()
 
+        self.Gallery.ui.treeNav.clear()
+        self.Gallery.ui.leftNavWidget.setVisible(False)
+
     def rendererChanged(self, val):
         self.Gallery.updateCurModelConfig({
             "renderer": val,
