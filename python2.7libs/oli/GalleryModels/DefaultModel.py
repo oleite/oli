@@ -260,30 +260,30 @@ class DefaultModel(object):
         pane = hou.ui.curDesktop().paneTabUnderCursor()
         if not pane:
             return
-        pane_type = pane.type()
+        paneType = pane.type()
 
-        if pane_type == hou.paneTabType.NetworkEditor:
+        if paneType == hou.paneTabType.NetworkEditor:
             pos = pane.cursorPosition()
-            imported_nodes = ag.importSelectedAssets()
+            importedNodes = ag.importSelectedAssets()
 
-            for idx, node in enumerate(imported_nodes):
+            for idx, node in enumerate(importedNodes):
                 if not node:
                     continue
                 node.setPosition(pos)
                 node.move((-.5, -.2))
                 node.move((0, idx*-1))
 
-        elif pane_type == hou.paneTabType.SceneViewer:
+        elif paneType == hou.paneTabType.SceneViewer:
             if pane.currentState() == "sidefx_lop_layout":
                 ag.import_selected_assets_to_lop_layout()
             else:
-                imported_nodes = []
+                importedNodes = []
                 for node in ag.importSelectedAssets():
                     node.moveToGoodPosition()
-                    imported_nodes.append(node)
-                utils.centralizeNodes(imported_nodes)
+                    importedNodes.append(node)
+                utils.centralizeNodes(importedNodes)
 
-        elif pane_type == hou.paneTabType.Parm:
+        elif paneType == hou.paneTabType.Parm:
             node = pane.currentNode()
             node_type = node.type().name()
 
@@ -297,17 +297,17 @@ class DefaultModel(object):
                 assetCountParm = node.parm("asset_count")
                 startIdx = assetCountParm.eval()
 
-                imported_nodes = ag.importSelectedAssets()
+                importedNodes = ag.importSelectedAssets()
 
-                for idx, importedNode in enumerate(imported_nodes):
+                for idx, impNode in enumerate(importedNodes):
                     idx += startIdx
                     assetCountParm.set(idx + 1)
 
-                    importedNode.setGenericFlag(hou.nodeFlag.Display, False)
+                    impNode.setGenericFlag(hou.nodeFlag.Display, False)
 
-                    sopNode = importedNode.node("OUT_MERGED")
+                    sopNode = impNode.node("OUT_MERGED")
                     if not sopNode:
-                        sopNode = importedNode.displayNode()
+                        sopNode = impNode.displayNode()
 
                     pathParm = node.parm("path_%d" % idx)
                     pathParm.set(sopNode.path())

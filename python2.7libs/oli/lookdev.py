@@ -246,10 +246,12 @@ def buildMaterialXMaterial(textures, nodeName, matnet):
     if albedoMap:
         mtlxImage = subnet.createNode("mtlximage", "albedo_map")
         mtlxStdSurface.setNamedInput("base_color", mtlxImage, 0)
+        mtlxStdSurface.setNamedInput("subsurface_color", mtlxImage, 0)
         mtlxImage.setParms({
             "signature": "color3",
             "file": albedoMap,
         })
+        
 
     if opacityMap:
         mtlxImage = subnet.createNode("mtlximage", "opacity_map")
@@ -281,7 +283,10 @@ def buildMaterialXMaterial(textures, nodeName, matnet):
         mtlxDisplacement = displacementOutput.createInputNode(0, "mtlxdisplacement")
         mtlxDisplacement.parm("scale").set(.01)
 
-        mtlxImage = mtlxDisplacement.createInputNode(0, "mtlximage", "displacement_map")
+        mtlxSubtract = mtlxDisplacement.createInputNode(0, "mtlxsubtract")
+        mtlxSubtract.parm("in2").set(.5)
+
+        mtlxImage = mtlxSubtract.createInputNode(0, "mtlximage", "displacement_map")
         mtlxImage.setParms({
             "signature": "default",
             "file": displacementMap,
@@ -289,12 +294,13 @@ def buildMaterialXMaterial(textures, nodeName, matnet):
 
     if translucencyMap:
         mtlxImage = subnet.createNode("mtlximage", "translucency_map")
-        mtlxStdSurface.setNamedInput("subsurface_color", mtlxImage, 0)
+        mtlxStdSurface.setNamedInput("subsurface_radius", mtlxImage, 0)
         mtlxImage.setParms({
             "signature": "color3",
             "file": translucencyMap,
         })
         mtlxStdSurface.parm("subsurface").set(1)
+        mtlxStdSurface.parm("subsurface_scale").set(0)
 
     subnet.layoutChildren()
     return subnet

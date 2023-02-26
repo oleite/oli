@@ -242,8 +242,6 @@ class MegascansModel(DefaultModel.DefaultModel):
         msId = itemData["ms_id"]
         msType = itemData["category"].split("/")[0]
 
-        obj = self.getObjNet()
-
         # ================================================================================
         # Survey for files
 
@@ -315,99 +313,32 @@ class MegascansModel(DefaultModel.DefaultModel):
         # Build
 
         nodeName = utils.makeSafe("_".join([msName, msId]))
+        
+        obj = self.getObjNet()
 
         if msType in ["3DAsset", "3DPlant", "Atlas"]:
             if not alembicList and msType in ["3DAsset", "3DPlant"]:
-                hou.ui.displayMessage("No alembic found", title="Build Megascans", help=assetDir,
-                                      severity=hou.severityType.Error)
+                hou.ui.displayMessage(
+                    "No alembic found", 
+                    title="Build Megascans", 
+                    help=assetDir,
+                    severity=hou.severityType.Error
+                )
                 return
-
-            objNode = obj.createNode("geo", nodeName)
-            matnet = objNode.createNode("matnet", "materials")
-            material = self.buildMaterial(textures, nodeName, matnet)
-
-
-            if msType == "Atlas" and "opacity" in textures:
-                opacityMap = textures["opacity"]
-
-                try:
-                    atlasSplitter = objNode.createNode("ODFX_AtlasSplitter")  # TODO
-                    atlasSplitter.setParms({
-                        "file": opacityMap,
-                    })
-                except hou.OperationFailed:
-                    atlasSplitter = objNode.createNode("null", "ODFX_AtlasSplitter")
-                    hou.ui.displayMessage("ODFX AtlasSplitter HDA wasn't found.", help="Available at: https://origamidigital.com")
-
-                matSop = atlasSplitter.createOutputNode("material", "assign_material")
-                matSop.parm("shop_materialpath1").set("../materials/{}".format(nodeName))
-
-                outNullSop = matSop.createOutputNode("null", "OUT_MERGED")
-                outNullSop.setGenericFlag(hou.nodeFlag.Display, True)
-                outNullSop.setGenericFlag(hou.nodeFlag.Render, True)
-                pass
+            
+            # Deciding whether to build an Obj or LOP network
+            pwd = None
+            pane = hou.ui.curDesktop().paneTabUnderCursor()
+            if pane:
+                paneType = pane.type()
+                if paneType == hou.paneTabType.NetworkEditor or paneType == hou.paneTabType.SceneViewer:
+                    pwd = pane.pwd()
+                    
+            if pwd and pwd.childTypeCategory().name() == "Lop":
+                return self.buildLop(textures, alembicList, msType, nodeName, pwd)
             else:
-                def cmToM(node):
-                    xformSop = node.createOutputNode("xform", "cm_to_m")
-                    xformSop.parm("scale").set(0.01)
-
-                    switchIf = node.createOutputNode("switchif", "if_convert_to_meters")
-                    switchIf.setInput(1, xformSop)
-                    switchIf.parm("expr1").setExpression("ch('../convert_to_meters')")
-                    return switchIf
-
-                mergeSop = objNode.createNode("merge", "variation_merge")
-                outNullMergedSop = cmToM(mergeSop).createOutputNode("null", "OUT_MERGED")
-
-                switchSop = objNode.createNode("switch", "variation_switch")
-                for abcPath in alembicList:
-                    name = utils.makeSafe(os.path.split(abcPath)[-1].replace(".abc", ""))
-
-                    abcSop = objNode.createNode("alembic", name)
-                    abcSop.parm("fileName").set(abcPath)
-
-                    nameSop = abcSop.createOutputNode("name", "name")
-                    nameSop.parm("name1").set(name)
-
-                    mergeSop.setNextInput(nameSop)
-                    switchSop.setNextInput(nameSop)
-
-                matSop = cmToM(switchSop).createOutputNode("material", "assign_material")
-                matSop.parm("shop_materialpath1").set("../materials/{}".format(nodeName))
-
-                outNullSop = matSop.createOutputNode("null", "OUT_SINGLE")
-                outNullSop.setGenericFlag(hou.nodeFlag.Display, True)
-                outNullSop.setGenericFlag(hou.nodeFlag.Render, True)
-
-                # ================================================================================
-                # Create "Variation" switch parm on top level objNode
-
-                geoCount = len(switchSop.inputs())
-
-                folderTemplateList = [
-                    hou.ToggleParmTemplate("convert_to_meters", "Convert to Meters", True)
-                ]
-                if geoCount > 1:
-                    folderTemplateList.append(
-                        hou.IntParmTemplate("variation", "Variation", 1, (0,), min=0, max=geoCount - 1),
-                    )
-                    switchSop.parm("input").setExpression("ch('../variation')")
-                else:
-                    switchSop.destroy()
-
-                folderTemplate = hou.FolderParmTemplate("tab_properties", "Properties", folderTemplateList,
-                                                        hou.folderType.Simple)
-
-                templateGroup = objNode.parmTemplateGroup()
-                templateGroup.insertBefore((0,), hou.SeparatorParmTemplate("sep"))
-                templateGroup.insertBefore((0,), folderTemplate)
-                objNode.setParmTemplateGroup(templateGroup)
-
-            matnet.layoutChildren()
-            objNode.layoutChildren()
-            objNode.setSelected(True, True)
-            return objNode
-
+                return self.buildObj(textures, alembicList, msType, nodeName)
+     
         else:
             material = self.buildMaterial(textures, nodeName)
             if material:
@@ -422,6 +353,176 @@ class MegascansModel(DefaultModel.DefaultModel):
             matnet.layoutChildren()
 
         return material
+    
+    def buildLop(self, textures, alembicList, msType, nodeName, lopnet):
+        subnet = lopnet.createNode("subnet", nodeName)
+        for indirectInput in subnet.indirectInputs():
+            indirectInput.setColor(hou.Color((0.185, 0.185, 0.185)))
+        
+        if msType == "Atlas":
+            hou.ui.displayMessage("Atlas is not supported in LOP networks yet.", title="Build Megascans", severity=hou.severityType.Error)
+            return
+        if not alembicList:
+            hou.ui.displayMessage("No alembic found", title="Build Megascans", severity=hou.severityType.Error)
+            return
+
+        def createCompGeometry(variantName, alembicPath):
+            compGeometry = subnet.createNode("componentgeometry", variantName)
+            compGeometry.setParms({
+                "geovariantname": variantName,
+            })
+            
+            sops = compGeometry.node("sopnet/geo")
+            
+            outDefault = sops.node("default")
+            outProxy = sops.node("proxy")
+            outSimProxy = sops.node("simproxy")
+            
+            abcSop = sops.createNode("alembic", "IN_alembic")
+            abcSop.setPosition(outDefault.position() + hou.Vector2(0, 5))
+            abcSop.parm("fileName").set(alembicPath)
+            
+            xformSop = abcSop.createOutputNode("xform", "cm_to_m")
+            xformSop.parm("scale").set(0.01)
+            
+            convertSop = xformSop.createOutputNode("convert")
+            
+            attrDeleteSop = convertSop.createOutputNode("attribdelete")
+            attrDeleteSop.setParms({
+                "negate": True,
+                "ptdel": "N",
+                "vtxdel": "uv uv2",
+            })
+            
+            outDefault.setInput(0, attrDeleteSop)
+                        
+            return compGeometry
+        
+        matLibrary = subnet.createNode("materiallibrary")
+        compMaterial = subnet.createNode("componentmaterial")
+        compOutput = subnet.createNode("componentoutput", nodeName)
+        new = [matLibrary, compMaterial, compOutput]
+        
+        matLibrary.parm("matpathprefix").set("/ASSET/mtl/")
+        compOutput.parm("rootprim").set("/" + nodeName)
+
+        material = self.buildMaterial(textures, nodeName, matLibrary)
+
+        if len(alembicList) > 1:
+            compGeoVariants = subnet.createNode("componentgeometryvariants")
+            new.append(compGeoVariants)
+    
+            for alembicPath in alembicList:
+                name = os.path.split(alembicPath)[-1].replace(".abc", "")
+                name = name.split("_LOD")[0]
+                
+                compGeometry = createCompGeometry(name, alembicPath)
+                new.append(compGeometry)
+                
+                compGeoVariants.setNextInput(compGeometry)
+    
+            compMaterial.setInput(0, compGeoVariants)
+        else:
+            compGeometry = createCompGeometry("default", alembicList[0])
+            new.append(compGeometry)
+            
+            compMaterial.setInput(0, compGeometry)
+            
+        compMaterial.setInput(1, matLibrary)
+        compOutput.setInput(0, compMaterial)
+        
+        subnet.node("output0").setInput(0, compOutput)
+        subnet.layoutChildren()
+        
+        return subnet
+    
+    def buildObj(self, textures, alembicList, msType, nodeName):
+        obj = self.getObjNet()
+
+        objNode = obj.createNode("geo", nodeName)
+        matnet = objNode.createNode("matnet", "materials")
+        material = self.buildMaterial(textures, nodeName, matnet)
+
+        if msType == "Atlas" and "opacity" in textures:
+            opacityMap = textures["opacity"]
+
+            try:
+                atlasSplitter = objNode.createNode("ODFX_AtlasSplitter")  # TODO
+                atlasSplitter.setParms({
+                    "file": opacityMap,
+                })
+            except hou.OperationFailed:
+                atlasSplitter = objNode.createNode("null", "ODFX_AtlasSplitter")
+                hou.ui.displayMessage("ODFX AtlasSplitter HDA wasn't found.", help="Available at: https://origamidigital.com")
+
+            matSop = atlasSplitter.createOutputNode("material", "assign_material")
+            matSop.parm("shop_materialpath1").set("../materials/{}".format(nodeName))
+
+            outNullSop = matSop.createOutputNode("null", "OUT_MERGED")
+            outNullSop.setGenericFlag(hou.nodeFlag.Display, True)
+            outNullSop.setGenericFlag(hou.nodeFlag.Render, True)
+            pass
+        else:
+            def cmToM(node):
+                xformSop = node.createOutputNode("xform", "cm_to_m")
+                xformSop.parm("scale").set(0.01)
+
+                switchIf = node.createOutputNode("switchif", "if_convert_to_meters")
+                switchIf.setInput(1, xformSop)
+                switchIf.parm("expr1").setExpression("ch('../convert_to_meters')")
+                return switchIf
+
+            mergeSop = objNode.createNode("merge", "variation_merge")
+            outNullMergedSop = cmToM(mergeSop).createOutputNode("null", "OUT_MERGED")
+
+            switchSop = objNode.createNode("switch", "variation_switch")
+            for abcPath in alembicList:
+                name = utils.makeSafe(os.path.split(abcPath)[-1].replace(".abc", ""))
+
+                abcSop = objNode.createNode("alembic", name)
+                abcSop.parm("fileName").set(abcPath)
+
+                nameSop = abcSop.createOutputNode("name", "name")
+                nameSop.parm("name1").set(name)
+
+                mergeSop.setNextInput(nameSop)
+                switchSop.setNextInput(nameSop)
+
+            matSop = cmToM(switchSop).createOutputNode("material", "assign_material")
+            matSop.parm("shop_materialpath1").set("../materials/{}".format(nodeName))
+
+            outNullSop = matSop.createOutputNode("null", "OUT_SINGLE")
+            outNullSop.setGenericFlag(hou.nodeFlag.Display, True)
+            outNullSop.setGenericFlag(hou.nodeFlag.Render, True)
+
+            # ================================================================================
+            # Create "Variation" switch parm on top level objNode
+
+            geoCount = len(switchSop.inputs())
+
+            folderTemplateList = [
+                hou.ToggleParmTemplate("convert_to_meters", "Convert to Meters", True)
+            ]
+            if geoCount > 1:
+                folderTemplateList.append(
+                    hou.IntParmTemplate("variation", "Variation", 1, (0,), min=0, max=geoCount - 1),
+                )
+                switchSop.parm("input").setExpression("ch('../variation')")
+            else:
+                switchSop.destroy()
+
+            folderTemplate = hou.FolderParmTemplate("tab_properties", "Properties", folderTemplateList,
+                                                    hou.folderType.Simple)
+
+            templateGroup = objNode.parmTemplateGroup()
+            templateGroup.insertBefore((0,), hou.SeparatorParmTemplate("sep"))
+            templateGroup.insertBefore((0,), folderTemplate)
+            objNode.setParmTemplateGroup(templateGroup)
+
+        matnet.layoutChildren()
+        objNode.layoutChildren()
+        objNode.setSelected(True, True)
+        return objNode
 
     def periodicRefresh(self):
         self.updateNavHierarchy()
