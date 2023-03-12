@@ -254,7 +254,20 @@ class MegascansModel(DefaultModel.DefaultModel):
             "translucency": None,
             "opacity": None,
         }
-        alembicList = []
+
+        alembicLODs = {}
+
+        def getLOD(abcPath):
+            splitted = abcPath.split("_LOD")
+            
+            root = splitted[0]
+            
+            if len(splitted) > 1:
+                lod = int(splitted[-1].replace(".abc", ""))
+            else:
+                lod = -1
+            
+            return root, lod
 
         def survey(_path):
             """
@@ -264,30 +277,36 @@ class MegascansModel(DefaultModel.DefaultModel):
             if not os.path.isfile(_path):
                 return
 
-            def getLOD(abcPath):
-                splitted = abcPath.split("_LOD")
-                
-                root = splitted[0]
-                
-                if len(splitted) > 1:
-                    lod = int(splitted[-1].replace(".abc", ""))
-                else:
-                    lod = -1
-                
-                return root, lod
-
             name = os.path.split(_path)[-1]
+            
             if name.endswith(".abc"):
-
-                # Checks if there is an Alembic at the same folder with a lower LOD number
                 root, lod = getLOD(_path)
-                for p in alembicList:
-                    _root, _lod = getLOD(p)
-                    if root == _root and lod > _lod:
+                
+                if not root in alembicLODs:
+                    alembicLODs[root] = {
+                        "render": {
+                            "path": None,
+                            "lod": 99999,
+                        },
+                        "proxy": {
+                            "path": None,
+                            "lod": -1,
+                        },
+                    }
+                    
+                    if lod == -1:
+                        alembicLODs[root]["render"]["path"] = _path
                         return
-
-                alembicList.append(_path)
-
+                                        
+                if alembicLODs[root]["render"]["lod"] > lod:
+                    alembicLODs[root]["render"]["path"] = _path
+                    alembicLODs[root]["render"]["lod"] = lod
+                    return
+                
+                if alembicLODs[root]["proxy"]["lod"] < lod:
+                    alembicLODs[root]["proxy"]["path"] = _path
+                    alembicLODs[root]["proxy"]["lod"] = lod
+                
             for texName in textures:
                 if texName.lower() in [s.lower() for s in name.replace(".", "_").split("_")]:
                     textures[texName] = _path
@@ -308,7 +327,7 @@ class MegascansModel(DefaultModel.DefaultModel):
                             survey(path3)
                     else:
                         survey(path2)
-
+                
         # ================================================================================
         # Build
 
@@ -317,7 +336,7 @@ class MegascansModel(DefaultModel.DefaultModel):
         obj = self.getObjNet()
 
         if msType in ["3DAsset", "3DPlant", "Atlas"]:
-            if not alembicList and msType in ["3DAsset", "3DPlant"]:
+            if not alembicLODs and msType in ["3DAsset", "3DPlant"]:
                 hou.ui.displayMessage(
                     "No alembic found", 
                     title="Build Megascans", 
@@ -335,9 +354,9 @@ class MegascansModel(DefaultModel.DefaultModel):
                     pwd = pane.pwd()
                     
             if pwd and pwd.childTypeCategory().name() == "Lop":
-                return self.buildLop(textures, alembicList, msType, nodeName, pwd)
+                return self.buildLop(textures, alembicLODs, msType, nodeName, pwd)
             else:
-                return self.buildObj(textures, alembicList, msType, nodeName)
+                return self.buildObj(textures, alembicLODs, msType, nodeName)
      
         else:
             material = self.buildMaterial(textures, nodeName)
@@ -436,12 +455,14 @@ class MegascansModel(DefaultModel.DefaultModel):
         
         return subnet
     
-    def buildObj(self, textures, alembicList, msType, nodeName):
+    def buildObj(self, textures, alembicLODs, msType, nodeName):
         obj = self.getObjNet()
 
         objNode = obj.createNode("geo", nodeName)
         matnet = objNode.createNode("matnet", "materials")
         material = self.buildMaterial(textures, nodeName, matnet)
+
+        hasResolutionSwitch = False
 
         if msType == "Atlas" and "opacity" in textures:
             opacityMap = textures["opacity"]
@@ -476,13 +497,37 @@ class MegascansModel(DefaultModel.DefaultModel):
             outNullMergedSop = cmToM(mergeSop).createOutputNode("null", "OUT_MERGED")
 
             switchSop = objNode.createNode("switch", "variation_switch")
-            for abcPath in alembicList:
-                name = utils.makeSafe(os.path.split(abcPath)[-1].replace(".abc", ""))
-
-                abcSop = objNode.createNode("alembic", name)
-                abcSop.parm("fileName").set(abcPath)
-
-                nameSop = abcSop.createOutputNode("name", "name")
+            for root, data in alembicLODs.items():
+                renderAbcPath = data["render"]["path"]
+                proxyAbcPath = data["proxy"]["path"]
+                
+                def getName(path):
+                    return utils.makeSafe(os.path.split(path)[-1].replace(".abc", ""))
+                
+                abcSopRender = objNode.createNode("alembic", getName(renderAbcPath))
+                abcSopRender.parm("fileName").set(renderAbcPath)
+                
+                if proxyAbcPath:
+                    hasResolutionSwitch = True
+                    
+                    abcSopProxy = objNode.createNode("alembic", getName(proxyAbcPath))
+                    abcSopProxy.parm("fileName").set(proxyAbcPath)
+                    
+                    switchPurpose = switchSop.createOutputNode("ol.Switch_Purpose")
+                    switchPurpose.setInput(0, abcSopRender)
+                    switchPurpose.setInput(1, abcSopProxy)
+                    
+                    switchPurpose.parm("render").setExpression("ch('../render_quality')")
+                    switchPurpose.parm("viewport").setExpression("ch('../viewport_quality')")
+                
+                    nameSop = switchPurpose.createOutputNode("name", "name")
+                else:
+                    nameSop = abcSopRender.createOutputNode("name", "name")
+                
+                name = getName(renderAbcPath)
+                if "_LOD" in name:
+                    name = name.split("_LOD")[0]
+                
                 nameSop.parm("name1").set(name)
 
                 mergeSop.setNextInput(nameSop)
@@ -501,8 +546,26 @@ class MegascansModel(DefaultModel.DefaultModel):
             geoCount = len(switchSop.inputs())
 
             folderTemplateList = [
-                hou.ToggleParmTemplate("convert_to_meters", "Convert to Meters", True)
+                hou.ToggleParmTemplate("convert_to_meters", "Convert to Meters", True),
             ]
+            
+            if hasResolutionSwitch:
+                folderTemplateList += [
+                    hou.SeparatorParmTemplate("quality_sep"),
+                    hou.MenuParmTemplate(
+                        name="viewport_quality",
+                        label="Viewport Quality",
+                        menu_items=["High", "Low"],
+                        default_value=1,
+                    ),
+                    hou.MenuParmTemplate(
+                        name="render_quality",
+                        label="Render Quality",
+                        menu_items=["High", "Low"],
+                        default_value=0,
+                    ),
+                ]
+            
             if geoCount > 1:
                 folderTemplateList.append(
                     hou.IntParmTemplate("variation", "Variation", 1, (0,), min=0, max=geoCount - 1),
