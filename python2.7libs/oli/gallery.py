@@ -107,7 +107,22 @@ class SignalEmitter(QObject):
 
 
 class Dialog(QDialog):
-    def __init__(self, message, parent=None, title="Houdini", hold=0.1, pos=None, frameless=True, centralized=True, cssColor="cyan"):
+    def __init__(self, message, parent=None, title="Houdini", hold=0.1, pos=None, frameless=True, centralized=True, cssColor="cyan", centerOnParent=False):
+        """
+        Simple dialog to display status messages to the user. 
+        Can be used in a with block to automatically close the dialog.
+        
+        :param message: Message to display
+        :param parent: Parent widget. If None, the main Houdini window will be used.
+        :param title: Dialog title
+        :param hold: Time to hold the dialog open after exiting the with block
+        :param pos: Position to display the dialog. If None, the dialog will be centered on the mouse cursor.
+        :param frameless: Whether to display the dialog without a window frame
+        :param centralized: Whether to display the dialog centered on the mouse cursor
+        :param cssColor: Color of the dialog border
+        :param centerOnParent: Whether to center the dialog on the parent widget. Overrides pos.     
+        """
+        
         if parent:
             self.parent = parent
         else:
@@ -116,10 +131,14 @@ class Dialog(QDialog):
         super(Dialog, self).__init__(self.parent)
         
         self.hold = hold
-        if pos:
+        
+        if centerOnParent:
+            self.pos = self.parent.mapToGlobal(self.parent.rect().center())
+        elif pos:
             self.pos = pos
         else:
             self.pos = QCursor.pos()
+            
         
         self.setWindowTitle(title)
         self.setMinimumSize(250, 100)
