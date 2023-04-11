@@ -107,7 +107,7 @@ class SignalEmitter(QObject):
 
 
 class Dialog(QDialog):
-    def __init__(self, message, parent=None, title="Houdini", hold=0.1, pos=None, frameless=True, centralized=True):
+    def __init__(self, message, parent=None, title="Houdini", hold=0.1, pos=None, frameless=True, centralized=True, cssColor="cyan"):
         if parent:
             self.parent = parent
         else:
@@ -144,11 +144,11 @@ class Dialog(QDialog):
         self.setLayout(layout)
 
         self.setStyleSheet("""
-            QDialog {
-                border-left: 5px solid cyan;
+            QDialog {{
+                border-left: 5px solid {};
                 border-radius: 5px;
-            }
-        """)
+            }}
+        """.format(cssColor))
 
         # Add a drop shadow to the dialog
         self.shadow = QGraphicsDropShadowEffect(self)
