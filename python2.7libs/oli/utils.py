@@ -9,6 +9,7 @@ from math import floor
 
 import toolutils
 import hou
+import nodegraphalign
 
 
 def sgtkExists(verbose=True):
@@ -350,3 +351,51 @@ def scaleWindow(windowSize, scaleFactor):
     scaledHeight = int(height * scaleFactor)
     position = ((width - scaledWidth) // 2, (height - scaledHeight) // 2)
     return position, (scaledWidth, scaledHeight)
+
+
+def traverseUp(node, leafNodeTypes=[]):
+    """
+    Traverse up the network, returning a list of all connected nodes (including the start node)
+    stopping at the first node that has no inputs or whose type is in leafNodeTypes.
+    
+    :param node: The node to start the traversal
+    :param leafNodes: A list of node type names to stop at
+    :return: Tuple of (nodes, leafNodes)
+    """
+    
+    nodes = [node]
+    leafNodes = []
+    
+    for inputNode in node.inputs():
+        if not inputNode or inputNode.type().name() in leafNodeTypes:
+            leafNodes.append(inputNode)
+            continue
+        
+        n, l = traverseUp(inputNode, leafNodeTypes)
+        nodes.extend(n)
+        leafNodes.extend(l)
+    
+    return nodes, leafNodes
+
+
+def alignConnectedUp(node):
+    """
+    Aligns all inputs in the node graph to the top of the node.
+    """
+    
+    editor = toolutils.networkEditor()
+    editor.setCurrentNode(node)
+    nodegraphalign.alignConnected(editor, node, node.position(), "up")
+
+
+def alignItemsUp(node, items):
+    """
+    Aligns selected items in the node graph to the top of the node.
+    """
+    
+    if node not in items:
+        items.append(node)
+    
+    editor = toolutils.networkEditor()
+    editor.setCurrentNode(node)
+    nodegraphalign.alignItems(editor, items, node, node.position(), "up")
