@@ -162,12 +162,7 @@ class Dialog(QDialog):
         layout.addWidget(self.label)
         self.setLayout(layout)
 
-        self.setStyleSheet("""
-            QDialog {{
-                border-left: 5px solid {};
-                border-radius: 5px;
-            }}
-        """.format(cssColor))
+        self.setCssColor(cssColor)
 
         # Add a drop shadow to the dialog
         self.shadow = QGraphicsDropShadowEffect(self)
@@ -177,6 +172,14 @@ class Dialog(QDialog):
         self.setGraphicsEffect(self.shadow)
 
         self.centralize()
+
+    def setCssColor(self, cssColor):
+        self.setStyleSheet("""
+            QDialog {{
+                border-left: 5px solid {};
+                border-radius: 5px;
+            }}
+        """.format(cssColor))
 
     def centralize(self):
         self.adjustSize()
@@ -1272,6 +1275,12 @@ class Gallery(QWidget):
             }
             .error {
                 color: red;
+            }
+            .warning {
+                color: orange;
+            }
+            .info {
+                color: cyan;
             }
         """)
 
