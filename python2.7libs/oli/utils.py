@@ -9,7 +9,7 @@ from math import floor
 
 import toolutils
 import hou
-import nodegraphalign
+
 
 
 def sgtkExists(verbose=True):
@@ -383,6 +383,8 @@ def alignConnectedUp(node):
     Aligns all inputs in the node graph to the top of the node.
     """
     
+    import nodegraphalign
+    
     editor = toolutils.networkEditor()
     editor.setCurrentNode(node)
     nodegraphalign.alignConnected(editor, node, node.position(), "up")
@@ -392,6 +394,8 @@ def alignItemsUp(node, items):
     """
     Aligns selected items in the node graph to the top of the node.
     """
+    
+    import nodegraphalign
     
     if node not in items:
         items.append(node)
