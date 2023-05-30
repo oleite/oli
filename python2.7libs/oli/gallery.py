@@ -280,9 +280,13 @@ class MyDelegate(QStyledItemDelegate):
             size.setHeight(size.height() - 40)
 
             pixmap = pixmap.scaled(size, Qt.KeepAspectRatio)
+
             pos = option.rect.topLeft()
-            pos += QPoint((pixmap.width() - size.width())/-2, (pixmap.width() - pixmap.height())/2.0)
+
+            pos += QPoint((size.width() - pixmap.width())/2, (size.height() - pixmap.height())/2)
+
             painter.drawPixmap(pos, pixmap)
+
 
         # ============================================================
         # Badges
