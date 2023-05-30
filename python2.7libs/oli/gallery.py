@@ -369,8 +369,9 @@ class AssetListWidget(object):
 
 
 class LoadItemThumbnail(QRunnable):
-    def __init__(self, item):
+    def __init__(self, item, verbose=False):
         self.item = item
+        self.verbose = verbose
         super(LoadItemThumbnail, self).__init__()
 
     def run(self):
@@ -392,8 +393,9 @@ class LoadItemThumbnail(QRunnable):
             self.item.setData(ITEM_THUMBNAIL_PIXMAP_ROLE, pixmap)
 
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            if self.verbose:
+                import traceback
+                traceback.print_exc()
             return
 
 class Gallery(QWidget):
