@@ -40,7 +40,7 @@ def wait(amount):
     return None
 
 
-def centralizeNodes(selection):
+def centralizeNodes(selection, paneTab=None):
     """
     Repositions nodes to the center of the Houdini networkEditor.
 
@@ -50,11 +50,12 @@ def centralizeNodes(selection):
     if not selection:
         return None
 
-    networkEditor = toolutils.networkEditor()
-    if not networkEditor:
-        return None
+    if not paneTab:
+        paneTab = toolutils.networkEditor()
+        if not paneTab:
+            return None
 
-    targetPos = networkEditor.visibleBounds().center()
+    targetPos = paneTab.visibleBounds().center()
 
     first_pos = selection[0].position()
     for node in selection:
@@ -63,7 +64,7 @@ def centralizeNodes(selection):
         node.move(targetPos - first_pos)
 
     wait(.1)
-    networkEditor.homeToSelection()
+    paneTab.homeToSelection()
     return targetPos
 
 
@@ -73,7 +74,16 @@ def moveNodeToCursor(node, paneTab=None):
 
     node.setPosition(paneTab.cursorPosition())
     node.move((-.5, -.2))
+    
+    
+def moveNodesToCursor(nodes, paneTab=None):
+    if not paneTab:
+        paneTab = toolutils.networkEditor()
 
+    offset = paneTab.cursorPosition() - nodes[0].position() + hou.Vector2((-.5, -.2))
+    for node in nodes:
+        node.move(offset)
+        
 
 def flashMessage(message, duration):
     """
