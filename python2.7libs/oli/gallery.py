@@ -280,9 +280,13 @@ class MyDelegate(QStyledItemDelegate):
             size.setHeight(size.height() - 40)
 
             pixmap = pixmap.scaled(size, Qt.KeepAspectRatio)
+
             pos = option.rect.topLeft()
-            pos += QPoint((pixmap.width() - size.width())/-2, (pixmap.width() - pixmap.height())/2.0)
+
+            pos += QPoint((size.width() - pixmap.width())/2, (size.height() - pixmap.height())/2)
+
             painter.drawPixmap(pos, pixmap)
+
 
         # ============================================================
         # Badges
@@ -365,8 +369,9 @@ class AssetListWidget(object):
 
 
 class LoadItemThumbnail(QRunnable):
-    def __init__(self, item):
+    def __init__(self, item, verbose=False):
         self.item = item
+        self.verbose = verbose
         super(LoadItemThumbnail, self).__init__()
 
     def run(self):
@@ -388,8 +393,9 @@ class LoadItemThumbnail(QRunnable):
             self.item.setData(ITEM_THUMBNAIL_PIXMAP_ROLE, pixmap)
 
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            if self.verbose:
+                import traceback
+                traceback.print_exc()
             return
 
 class Gallery(QWidget):
