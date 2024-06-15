@@ -5,7 +5,7 @@ import os
 import re
 
 import hou
-from imp import reload
+from importlib import reload
 
 import pyperclip
 import toolutils

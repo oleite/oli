@@ -6,7 +6,7 @@ import os
 import sys
 import time
 import webbrowser
-from imp import reload
+from importlib import reload
 
 import hou
 import toolutils
@@ -20,7 +20,6 @@ from . import galleryUi
 from . import lookdev
 from . import utils
 
-reload(utils)
 
 iconsPath = hou.getenv("OLI_ICONS")
 

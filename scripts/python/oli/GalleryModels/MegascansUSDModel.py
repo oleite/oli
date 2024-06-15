@@ -4,7 +4,7 @@ import json
 import os
 
 import hou
-from imp import reload
+from importlib import reload
 
 import pyperclip
 from PySide2 import QtWidgets, QtCore

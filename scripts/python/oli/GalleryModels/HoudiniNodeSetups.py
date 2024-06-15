@@ -7,7 +7,7 @@ import os
 import shutil
 
 import hou
-from imp import reload
+from importlib import reload
 
 import toolutils
 from PySide2 import QtWidgets, QtCore

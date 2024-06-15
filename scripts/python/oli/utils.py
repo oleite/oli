@@ -12,21 +12,6 @@ import hou
 
 
 
-def sgtkExists(verbose=True):
-    """
-    Checks if ShotGrid modules are available module exists.
-
-    :return: Whether the sgtk module was found.
-    """
-    try:
-        imp.find_module("sgtk")
-        return True
-    except Exception as e:
-        if verbose:
-            print(e)
-        return False
-
-
 def wait(amount):
     """
     Stops the code execution for the specified amount of time while keeping Houdini responsive.
