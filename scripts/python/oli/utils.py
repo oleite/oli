@@ -70,15 +70,17 @@ def moveNodesToCursor(nodes, paneTab=None):
         node.move(offset)
         
 
-def flashMessage(message, duration):
+def flashMessage(message, duration, imagefile=""):
     """
-
-    :param message:
-    :param duration:
+    Displays a message in the scene viewer and network editor.
+    
+    :param message: Message to be displayed.
+    :param duration: Time in seconds the message will be displayed.
+    :param imagefile: Path to the image file to be displayed in the message.
     :return:
     """
-    toolutils.sceneViewer().flashMessage("", message, duration)
-    toolutils.networkEditor().flashMessage("", message, duration)
+    toolutils.sceneViewer().flashMessage(imagefile, message, duration)
+    toolutils.networkEditor().flashMessage(imagefile, message, duration)
 
 
 def getGeometry(node):
