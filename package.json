@@ -1,0 +1,23 @@
+{
+    "enabled": true,
+    "env": [
+        {
+            "OLI_ROOT": {
+                "value": "$HOUDINI_PACKAGE_PATH",
+                "method": "set"
+            }
+        },
+        {
+            "HOUDINI_PATH": {
+                "value": "$OLI_ROOT/houdini",
+                "method": "append"
+            }
+        },
+        {
+            "PYTHONPATH": {
+                "value": "$OLI_ROOT/python",
+                "method": "append"
+            }
+        }
+    ]
+}
